@@ -268,20 +268,7 @@ export function RAGChat({
             <span>{voiceMode ? 'Voice ON' : 'Voice'}</span>
           </button>
 
-          {/* Gemini AI Key Status Button */}
-          <button
-            type="button"
-            onClick={() => setIsConfigOpen(true)}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-              hasGeminiKey
-                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-100'
-                : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-500/30 hover:bg-amber-100'
-            }`}
-            title="Configure Google Gemini API Key"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>{hasGeminiKey ? 'Gemini AI Active' : 'Enable Gemini'}</span>
-          </button>
+
 
           <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500">
             <Globe className="w-3.5 h-3.5" />

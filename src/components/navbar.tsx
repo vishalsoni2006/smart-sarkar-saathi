@@ -16,10 +16,8 @@ import {
   Moon,
   Bookmark,
   Layers,
-  Settings2,
   Menu,
   X,
-  Sparkles,
   ClipboardCheck,
   Search,
   CheckCircle2,
@@ -285,29 +283,7 @@ export function Navbar() {
               )}
             </button>
 
-            {/* Quick Gemini API Key Configuration Button */}
-            <button
-              type="button"
-              onClick={() => setIsConfigOpen(true)}
-              className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-all hover:scale-105 cursor-pointer shadow-xs ${
-                hasGeminiKey
-                  ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-100'
-                  : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-500/30 hover:bg-amber-100'
-              }`}
-              title="Configure Google Gemini API Key"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>{hasGeminiKey ? 'Gemini Active' : 'Enable Gemini'}</span>
-            </button>
 
-            {/* Settings */}
-            <button
-              onClick={() => setIsConfigOpen(true)}
-              className="w-10 h-10 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:text-[#1E40AF] dark:hover:text-blue-400 flex items-center justify-center transition-colors cursor-pointer"
-              title="API & Firebase Settings"
-            >
-              <Settings2 className="w-4 h-4" />
-            </button>
 
             {/* Mobile Menu Toggle */}
             <button
@@ -375,29 +351,7 @@ export function Navbar() {
                 {t('navProfile')}
               </Link>
 
-              {/* Gemini API Key Mobile Option */}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsConfigOpen(true);
-                  setIsMobileMenuOpen(false);
-                }}
-                className="w-full px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-500/30 text-amber-800 dark:text-amber-200 font-bold flex items-center justify-between text-xs cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-500" />
-                  <span>Google Gemini API Key</span>
-                </div>
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                    hasGeminiKey
-                      ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                      : 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
-                  }`}
-                >
-                  {hasGeminiKey ? 'Active' : 'Enable'}
-                </span>
-              </button>
+
               <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
                 {authUser ? (
                   <div className="flex items-center justify-between p-2 rounded-xl bg-slate-100 dark:bg-slate-800">

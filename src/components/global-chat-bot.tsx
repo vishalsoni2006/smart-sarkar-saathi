@@ -393,19 +393,7 @@ export function GlobalChatBot() {
                 {voiceMode ? <Volume2 className="w-4 h-4 text-amber-300 animate-pulse" /> : <VolumeX className="w-4 h-4" />}
               </button>
 
-              {/* Gemini Status Indicator */}
-              <button
-                type="button"
-                onClick={() => setIsConfigOpen(true)}
-                className={`p-1.5 rounded-lg border text-xs cursor-pointer ${
-                  hasGeminiKey
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                }`}
-                title={hasGeminiKey ? 'Gemini 1.5/3.6 Flash Active' : 'Configure Gemini API Key'}
-              >
-                <Sparkles className="w-4 h-4" />
-              </button>
+
 
               {/* Close Button */}
               <button
