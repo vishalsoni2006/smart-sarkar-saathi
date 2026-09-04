@@ -116,6 +116,16 @@ export function extractFieldUpdate(
   return null;
 }
 
+export {
+  getActiveGeminiKey,
+  saveGeminiKey,
+  getActiveGroqKey,
+  saveGroqKey,
+  testGeminiApiKey
+} from '@/lib/llm/gemini-config';
+
+import { getActiveGeminiKey, getActiveGroqKey, CANDIDATE_GEMINI_MODELS } from '@/lib/llm/gemini-config';
+
 /**
  * Execute RAG grounded chat with LLM & Multilingual translation
  */
@@ -138,14 +148,13 @@ export async function executeGroundedRAGChat(params: {
   const citations = retrieved.map((r) => r.citation);
 
   // 4. Check API keys
-  const geminiKey = process.env.GEMINI_API_KEY || (typeof window !== 'undefined' ? localStorage.getItem('scheme_navigator_gemini_key') : null);
-  const groqKey = process.env.GROQ_API_KEY || (typeof window !== 'undefined' ? localStorage.getItem('scheme_navigator_groq_key') : null);
+  const geminiKey = getActiveGeminiKey();
+  const groqKey = getActiveGroqKey();
 
   // If Gemini API is available
   if (geminiKey) {
     try {
       const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
       const prompt = `You are "Scheme Navigator AI", an official Government of India scheme assistance specialist.
 CRITICAL INSTRUCTIONS:
@@ -176,16 +185,26 @@ CITIZEN'S QUESTION:
 
 ANSWER (in ${detectedLang.name}):`;
 
-      const result = await model.generateContent(prompt);
-      const answerText = result.response.text();
+      for (const modelName of CANDIDATE_GEMINI_MODELS) {
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const result = await model.generateContent(prompt);
+          const answerText = result.response.text();
 
-      return {
-        answer: answerText,
-        detectedLanguage: detectedLang.name,
-        citations,
-        suggestedPrompts: getSuggestedPrompts(scheme, detectedLang.code),
-        fieldUpdated: fieldUpdate
-      };
+          if (answerText) {
+            return {
+              answer: answerText,
+              detectedLanguage: detectedLang.name,
+              citations,
+              suggestedPrompts: getSuggestedPrompts(scheme, detectedLang.code),
+              fieldUpdated: fieldUpdate
+            };
+          }
+        } catch (modelErr) {
+          // Continue to next candidate model
+          continue;
+        }
+      }
     } catch (e) {
       console.warn('Gemini API call failed, attempting Groq fallback:', e);
     }

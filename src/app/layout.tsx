@@ -5,6 +5,7 @@ import { LanguageProvider } from '@/components/language-provider';
 import { Navbar } from '@/components/navbar';
 import { Footer } from '@/components/footer';
 import { AccessibilityWidget } from '@/components/accessibility-widget';
+import { GlobalChatBot } from '@/components/global-chat-bot';
 
 export const metadata: Metadata = {
   title: 'myScheme — National Platform for Government Schemes & Services',
@@ -54,6 +55,7 @@ export default function RootLayout({
             <main className="flex-1">{children}</main>
             <Footer />
             <AccessibilityWidget />
+            <GlobalChatBot />
           </LanguageProvider>
         </ThemeProvider>
       </body>

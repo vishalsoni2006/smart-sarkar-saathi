@@ -3,8 +3,32 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage, Citation, Scheme, UserProfile } from '@/types';
 import { executeGroundedRAGChat } from '@/lib/llm/client';
+import { getActiveGeminiKey } from '@/lib/llm/gemini-config';
 import { useLanguage } from '@/components/language-provider';
-import { Send, Bot, User, Sparkles, BookOpen, ExternalLink, Globe, Check, AlertCircle } from 'lucide-react';
+import { ApiConfigModal } from '@/components/api-config-modal';
+import {
+  Send,
+  Bot,
+  User,
+  Sparkles,
+  BookOpen,
+  ExternalLink,
+  Globe,
+  Check,
+  AlertCircle,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Square,
+  Radio
+} from 'lucide-react';
+import {
+  startVoiceRecognition,
+  speakText,
+  stopSpeaking,
+  REGIONAL_SPEECH_LANGS
+} from '@/lib/voice/speech';
 
 interface RAGChatProps {
   scheme: Scheme;
@@ -21,12 +45,85 @@ export function RAGChat({
   targetMissingQuestion,
   onProfileUpdated
 }: RAGChatProps) {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [hasGeminiKey, setHasGeminiKey] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(true);
+  const [isListening, setIsListening] = useState(false);
+  const [activeSpeakingId, setActiveSpeakingId] = useState<string | null>(null);
+  const [speechLang, setSpeechLang] = useState(language || 'hi');
+  const [speechError, setSpeechError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<{ stop: () => void } | null>(null);
+
+  useEffect(() => {
+    setSpeechLang(language || 'hi');
+  }, [language]);
+
+  useEffect(() => {
+    setHasGeminiKey(Boolean(getActiveGeminiKey()));
+    const handleKeyChange = () => {
+      setHasGeminiKey(Boolean(getActiveGeminiKey()));
+    };
+    window.addEventListener('scheme_navigator_api_keys_changed', handleKeyChange);
+    return () => window.removeEventListener('scheme_navigator_api_keys_changed', handleKeyChange);
+  }, []);
+
+  const getLangCodeFromName = (name?: string): string => {
+    const n = (name || '').toLowerCase();
+    if (n.includes('hindi')) return 'hi';
+    if (n.includes('marathi')) return 'mr';
+    if (n.includes('bengali')) return 'bn';
+    if (n.includes('tamil')) return 'ta';
+    if (n.includes('telugu')) return 'te';
+    return speechLang || 'en';
+  };
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    setSpeechError(null);
+    const recognition = startVoiceRecognition({
+      langCode: speechLang,
+      onStart: () => setIsListening(true),
+      onResult: (transcript, isFinal) => {
+        setInput(transcript);
+      },
+      onError: (err) => {
+        setSpeechError(err);
+        setIsListening(false);
+      },
+      onEnd: () => {
+        setIsListening(false);
+      }
+    });
+    recognitionRef.current = recognition;
+  };
+
+  const toggleSpeakMessage = (msgId: string, content: string, langName?: string) => {
+    if (activeSpeakingId === msgId) {
+      stopSpeaking();
+      setActiveSpeakingId(null);
+      return;
+    }
+
+    stopSpeaking();
+    setActiveSpeakingId(msgId);
+    speakText(content, {
+      langCode: getLangCodeFromName(langName),
+      onStart: () => setActiveSpeakingId(msgId),
+      onEnd: () => setActiveSpeakingId(null),
+      onError: () => setActiveSpeakingId(null)
+    });
+  };
 
   // Initialize initial welcome message or targeted follow-up question
   useEffect(() => {
@@ -106,6 +203,17 @@ export function RAGChat({
 
       setMessages((prev) => [...prev, botMsg]);
 
+      // If voice mode is active, speak the answer aloud in user's language
+      if (voiceMode) {
+        setActiveSpeakingId(botMsg.id);
+        speakText(botMsg.content, {
+          langCode: getLangCodeFromName(botMsg.detected_language),
+          onStart: () => setActiveSpeakingId(botMsg.id),
+          onEnd: () => setActiveSpeakingId(null),
+          onError: () => setActiveSpeakingId(null)
+        });
+      }
+
       // If user provided the missing field, trigger live update to flip verdict!
       if (response.fieldUpdated && onProfileUpdated) {
         onProfileUpdated(response.fieldUpdated.field, response.fieldUpdated.value);
@@ -147,9 +255,47 @@ export function RAGChat({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <Globe className="w-3.5 h-3.5" />
-          <span>{t('multilingualBadge', 'Multilingual')}</span>
+        <div className="flex items-center gap-2">
+          {/* Voice Mode Toggle Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (voiceMode) {
+                stopSpeaking();
+                setActiveSpeakingId(null);
+              }
+              setVoiceMode(!voiceMode);
+            }}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+              voiceMode
+                ? 'bg-[#1E40AF] text-white border-[#1E40AF] shadow-xs'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-200'
+            }`}
+            title={voiceMode ? 'Voice Answer Mode: ON (assistant will speak answers aloud)' : 'Click to enable Voice Answer Mode'}
+          >
+            {voiceMode ? <Volume2 className="w-3.5 h-3.5 animate-pulse" /> : <VolumeX className="w-3.5 h-3.5" />}
+            <span>{voiceMode ? 'Voice ON' : 'Voice'}</span>
+          </button>
+
+          {/* Gemini AI Key Status Button */}
+          <button
+            type="button"
+            onClick={() => setIsConfigOpen(true)}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+              hasGeminiKey
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-100'
+                : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-500/30 hover:bg-amber-100'
+            }`}
+            title="Configure Google Gemini API Key"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <span>{hasGeminiKey ? 'Gemini AI Active' : 'Enable Gemini'}</span>
+          </button>
+
+          <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-500">
+            <Globe className="w-3.5 h-3.5" />
+            <span>{t('multilingualBadge', 'Multilingual')}</span>
+          </div>
         </div>
       </div>
 
@@ -221,11 +367,35 @@ export function RAGChat({
                 )}
 
                 <div
-                  className={`text-[10px] text-slate-400 dark:text-slate-500 px-1 ${
+                  className={`text-[10px] text-slate-400 dark:text-slate-500 px-1 flex items-center justify-between gap-2 ${
                     isBot ? 'text-left' : 'text-right'
                   }`}
                 >
-                  {msg.timestamp} {msg.detected_language && `• ${msg.detected_language}`}
+                  <span>{msg.timestamp} {msg.detected_language && `• ${msg.detected_language}`}</span>
+                  {isBot && (
+                    <button
+                      type="button"
+                      onClick={() => toggleSpeakMessage(msg.id, msg.content, msg.detected_language)}
+                      className={`p-1 rounded-md text-xs transition-colors cursor-pointer flex items-center gap-1 font-semibold ${
+                        activeSpeakingId === msg.id
+                          ? 'text-blue-600 bg-blue-100 dark:bg-blue-900/50 animate-pulse'
+                          : 'text-slate-400 hover:text-blue-600 dark:hover:text-blue-400'
+                      }`}
+                      title={activeSpeakingId === msg.id ? 'Stop Voice Playback' : 'Listen to this answer'}
+                    >
+                      {activeSpeakingId === msg.id ? (
+                        <>
+                          <Square className="w-3 h-3 fill-current text-blue-600" />
+                          <span>Stop</span>
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-3.5 h-3.5" />
+                          <span>Listen</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -263,7 +433,34 @@ export function RAGChat({
         </div>
       )}
 
-      {/* Input Form */}
+      {/* Listening Status Strip */}
+      {isListening && (
+        <div className="px-4 py-2 bg-rose-50 dark:bg-rose-950/40 border-t border-rose-200 dark:border-rose-900/50 flex items-center justify-between text-xs text-rose-700 dark:text-rose-300 animate-pulse">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-rose-600 animate-ping" />
+            <span className="font-bold">
+              Listening in {REGIONAL_SPEECH_LANGS[speechLang]?.name || 'Hindi'} ({REGIONAL_SPEECH_LANGS[speechLang]?.nativeName})...
+            </span>
+            <span className="text-slate-500 italic">Speak now</span>
+          </div>
+          <button
+            type="button"
+            onClick={toggleListening}
+            className="text-xs font-bold underline cursor-pointer hover:text-rose-900"
+          >
+            Done
+          </button>
+        </div>
+      )}
+
+      {speechError && (
+        <div className="px-4 py-1.5 bg-amber-50 dark:bg-amber-950/40 border-t border-amber-200 dark:border-amber-900/50 flex items-center justify-between text-[11px] text-amber-800 dark:text-amber-200">
+          <span>{speechError}</span>
+          <button onClick={() => setSpeechError(null)} className="font-bold text-amber-600 ml-2">✕</button>
+        </div>
+      )}
+
+      {/* Input Form with Microphone */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -271,11 +468,48 @@ export function RAGChat({
         }}
         className="p-3 border-t border-slate-200 dark:border-blue-900/30 bg-white dark:bg-[#0D1E38] flex items-center gap-2"
       >
+        {/* Voice Language Selector */}
+        <select
+          value={speechLang}
+          onChange={(e) => setSpeechLang(e.target.value as any)}
+          className="hidden sm:block text-[11px] font-bold px-2 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer focus:outline-none"
+          title="Microphone input language"
+        >
+          <option value="hi">हिंदी (Hindi)</option>
+          <option value="mr">मराठी (Marathi)</option>
+          <option value="bn">বাংলা (Bengali)</option>
+          <option value="ta">தமிழ் (Tamil)</option>
+          <option value="te">తెలుగు (Telugu)</option>
+          <option value="en">English (India)</option>
+        </select>
+
+        {/* Microphone Button */}
+        <button
+          type="button"
+          onClick={toggleListening}
+          className={`p-2.5 rounded-xl border transition-all cursor-pointer shrink-0 flex items-center justify-center ${
+            isListening
+              ? 'bg-rose-600 text-white border-rose-600 animate-pulse shadow-md'
+              : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700'
+          }`}
+          title={
+            isListening
+              ? 'Listening in ' + (REGIONAL_SPEECH_LANGS[speechLang]?.name || 'Hindi') + '... Tap to stop'
+              : 'Tap to speak in ' + (REGIONAL_SPEECH_LANGS[speechLang]?.name || 'Hindi')
+          }
+        >
+          {isListening ? (
+            <Radio className="w-4 h-4 text-white animate-spin" />
+          ) : (
+            <Mic className="w-4 h-4 text-[#1E40AF] dark:text-blue-400" />
+          )}
+        </button>
+
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={t('chatPlaceholder', `Ask about ${scheme.short_name} in any language...`)}
+          placeholder={t('chatPlaceholder', `Ask about ${scheme.short_name} or tap mic to speak in regional language...`)}
           className="flex-1 px-4 py-2.5 text-xs sm:text-sm rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E40AF] text-slate-900 dark:text-white"
         />
 
@@ -287,6 +521,9 @@ export function RAGChat({
           <Send className="w-4 h-4" />
         </button>
       </form>
+
+      {/* Gemini AI & Cloud Settings Modal */}
+      <ApiConfigModal isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} />
     </div>
   );
 }
