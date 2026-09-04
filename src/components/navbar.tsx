@@ -142,9 +142,6 @@ export function Navbar() {
                   <span className="ml-1.5 text-xl sm:text-2xl font-black tracking-tight text-[#EA580C] dark:text-[#F97316]">
                     Saathi
                   </span>
-                  <span className="ml-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 hidden sm:inline">
-                    .gov.in
-                  </span>
                 </div>
                 <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium tracking-wide mt-0.5 hidden sm:block">
                   {t('portalMotto')}

@@ -201,7 +201,7 @@ export default function HomePage() {
                 <div className="relative rounded-2xl overflow-hidden group">
                   <Image
                     src="/images/smart_sarkar_saathi_banner.png"
-                    alt="Smart Sarkar Saathi Portal - Scheme.gov.in Aapke Liye. Hamesha. Farming, Education, Health, Housing"
+                    alt="Smart Sarkar Saathi Portal - Citizen Portal • For You, Always. Farming, Education, Health, Housing"
                     width={1200}
                     height={896}
                     priority
