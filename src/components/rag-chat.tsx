@@ -3,9 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage, Citation, Scheme, UserProfile } from '@/types';
 import { executeGroundedRAGChat } from '@/lib/llm/client';
-import { getActiveGeminiKey } from '@/lib/llm/gemini-config';
 import { useLanguage } from '@/components/language-provider';
-import { ApiConfigModal } from '@/components/api-config-modal';
 import {
   Send,
   Bot,
@@ -50,8 +48,6 @@ export function RAGChat({
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
-  const [hasGeminiKey, setHasGeminiKey] = useState(false);
   const [voiceMode, setVoiceMode] = useState(true);
   const [isListening, setIsListening] = useState(false);
   const [activeSpeakingId, setActiveSpeakingId] = useState<string | null>(null);
@@ -64,14 +60,6 @@ export function RAGChat({
     setSpeechLang(language || 'hi');
   }, [language]);
 
-  useEffect(() => {
-    setHasGeminiKey(Boolean(getActiveGeminiKey()));
-    const handleKeyChange = () => {
-      setHasGeminiKey(Boolean(getActiveGeminiKey()));
-    };
-    window.addEventListener('scheme_navigator_api_keys_changed', handleKeyChange);
-    return () => window.removeEventListener('scheme_navigator_api_keys_changed', handleKeyChange);
-  }, []);
 
   const toggleListening = () => {
     if (isListening) {
@@ -506,8 +494,6 @@ export function RAGChat({
         </button>
       </form>
 
-      {/* Gemini AI & Cloud Settings Modal */}
-      <ApiConfigModal isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} />
     </div>
   );
 }

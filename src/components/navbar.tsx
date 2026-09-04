@@ -6,8 +6,6 @@ import { useTheme } from '@/components/theme-provider';
 import { useLanguage } from '@/components/language-provider';
 import { SUPPORTED_LANGUAGES } from '@/lib/i18n/translations';
 import { DemoPersonaSwitcher } from '@/components/demo-persona-switcher';
-import { ApiConfigModal } from '@/components/api-config-modal';
-import { getActiveGeminiKey } from '@/lib/llm/gemini-config';
 import { getSavedSchemeIds } from '@/lib/firebase/storage';
 import { getAuthenticatedUser, logoutCitizen, UserAccount } from '@/lib/firebase/auth';
 import {
@@ -35,13 +33,10 @@ export function Navbar() {
   const [savedCount, setSavedCount] = useState(2);
   const [authUser, setAuthUser] = useState<UserAccount | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
-  const [hasGeminiKey, setHasGeminiKey] = useState(false);
 
   useEffect(() => {
     setSavedCount(getSavedSchemeIds().length);
     setAuthUser(getAuthenticatedUser());
-    setHasGeminiKey(Boolean(getActiveGeminiKey()));
 
     const handleSavedUpdate = (e: any) => {
       setSavedCount(e.detail.length);
@@ -51,17 +46,11 @@ export function Navbar() {
       setAuthUser(e.detail);
     };
 
-    const handleKeysUpdate = () => {
-      setHasGeminiKey(Boolean(getActiveGeminiKey()));
-    };
-
     window.addEventListener('scheme_navigator_saved_updated', handleSavedUpdate);
     window.addEventListener('scheme_navigator_auth_change', handleAuthUpdate);
-    window.addEventListener('scheme_navigator_api_keys_changed', handleKeysUpdate);
     return () => {
       window.removeEventListener('scheme_navigator_saved_updated', handleSavedUpdate);
       window.removeEventListener('scheme_navigator_auth_change', handleAuthUpdate);
-      window.removeEventListener('scheme_navigator_api_keys_changed', handleKeysUpdate);
     };
   }, []);
 
@@ -147,13 +136,13 @@ export function Navbar() {
               <div className="hidden sm:block text-slate-300 dark:text-slate-600 font-light text-xl">|</div>
               <div>
                 <div className="flex items-baseline leading-none">
-                  <span className="text-2xl font-black tracking-tight text-[#1E40AF] dark:text-[#60A5FA]">
-                    my
+                  <span className="text-xl sm:text-2xl font-black tracking-tight text-[#1E40AF] dark:text-[#60A5FA]">
+                    Smart Sarkar
                   </span>
-                  <span className="text-2xl font-black tracking-tight text-[#0F172A] dark:text-white">
-                    Scheme
+                  <span className="ml-1.5 text-xl sm:text-2xl font-black tracking-tight text-[#EA580C] dark:text-[#F97316]">
+                    Saathi
                   </span>
-                  <span className="ml-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500">
+                  <span className="ml-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 hidden sm:inline">
                     .gov.in
                   </span>
                 </div>
@@ -387,8 +376,6 @@ export function Navbar() {
         )}
       </header>
 
-      {/* Cloud & API Configuration Modal */}
-      <ApiConfigModal isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} />
     </>
   );
 }

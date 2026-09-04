@@ -4,10 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Bot, X, Send, Mic, Volume2, VolumeX, Sparkles, BookOpen, ExternalLink, Globe, Radio, Square, Layers, MessageSquare } from 'lucide-react';
 import { VERIFIED_SCHEMES } from '@/data/schemes';
 import { executeGroundedRAGChat } from '@/lib/llm/client';
-import { getActiveGeminiKey } from '@/lib/llm/gemini-config';
 import { getSchemesForOccupation } from '@/lib/rag/vector-search';
 import { useLanguage } from '@/components/language-provider';
-import { ApiConfigModal } from '@/components/api-config-modal';
 import {
   startVoiceRecognition,
   speakText,
@@ -136,8 +134,6 @@ export function GlobalChatBot() {
   const [activeSpeakingId, setActiveSpeakingId] = useState<string | null>(null);
   const [speechLang, setSpeechLang] = useState(language || 'hi');
   const [speechError, setSpeechError] = useState<string | null>(null);
-  const [hasGeminiKey, setHasGeminiKey] = useState(false);
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
@@ -146,14 +142,6 @@ export function GlobalChatBot() {
     setSpeechLang(language || 'hi');
   }, [language]);
 
-  useEffect(() => {
-    setHasGeminiKey(Boolean(getActiveGeminiKey()));
-    const handleKeyChange = () => {
-      setHasGeminiKey(Boolean(getActiveGeminiKey()));
-    };
-    window.addEventListener('scheme_navigator_api_keys_changed', handleKeyChange);
-    return () => window.removeEventListener('scheme_navigator_api_keys_changed', handleKeyChange);
-  }, []);
 
   const handleLanguageChange = (newLang: string) => {
     setSpeechLang(newLang as any);
@@ -683,8 +671,6 @@ export function GlobalChatBot() {
         </div>
       )}
 
-      {/* Cloud & API Configuration Modal */}
-      <ApiConfigModal isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)} />
     </>
   );
 }

@@ -663,7 +663,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     next: 'Next',
     previous: "Previous",
 
-    footerDesc: "myScheme is an official National Platform providing an innovative, citizen-centric service to discover government welfare schemes and financial support based on your eligibility.",
+    footerDesc: "Smart Sarkar Saathi is an official National Platform providing an innovative, citizen-centric service to discover government welfare schemes and financial support based on your eligibility.",
     officialGovPortal15: "Official Government Portal • 15 Verified National Schemes",
     goiPortalsTitle: "Government of India Portals",
     nationalPortalOfIndia: "National Portal of India",
@@ -943,7 +943,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     next: 'आगे',
     previous: "पीछे",
 
-    footerDesc: "myScheme एक आधिकारिक राष्ट्रीय मंच है जो आपकी पात्रता के आधार पर सरकारी कल्याणकारी योजनाओं और वित्तीय सहायता की खोज के लिए नागरिक-केंद्रित सेवा प्रदान करता है।",
+    footerDesc: "Smart Sarkar Saathi (स्मार्ट सरकार साथी) एक आधिकारिक राष्ट्रीय मंच है जो आपकी पात्रता के आधार पर सरकारी कल्याणकारी योजनाओं और वित्तीय सहायता की खोज के लिए नागरिक-केंद्रित सेवा प्रदान करता है।",
     officialGovPortal15: "आधिकारिक सरकारी पोर्टल • 15 प्रमाणित राष्ट्रीय योजनाएं",
     goiPortalsTitle: "भारत सरकार के महत्वपूर्ण पोर्टल",
     nationalPortalOfIndia: "भारत का राष्ट्रीय पोर्टल",
@@ -1223,7 +1223,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     next: 'पुढे',
     previous: "मागे",
 
-    footerDesc: "myScheme हे एक अधिकृत राष्ट्रीय व्यासपीठ आहे जे आपल्या पात्रतेनुसार सरकारी कल्याणकारी योजना आणि आर्थिक सहाय्य शोधण्यासाठी नागरिक-केंद्रित सेवा प्रदान करते.",
+    footerDesc: "Smart Sarkar Saathi (स्मार्ट सरकार साथी) हे एक अधिकृत राष्ट्रीय व्यासपीठ आहे जे आपल्या पात्रतेनुसार सरकारी कल्याणकारी योजना आणि आर्थिक सहाय्य शोधण्यासाठी नागरिक-केंद्रित सेवा प्रदान करते.",
     officialGovPortal15: "अधिकृत शासकीय पोर्टल • 15 सत्यापित राष्ट्रीय योजना",
     goiPortalsTitle: "भारत सरकारचे अधिकृत पोर्टल्स",
     nationalPortalOfIndia: "भारताचे राष्ट्रीय पोर्टल",
@@ -1503,7 +1503,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     next: 'পরবর্তী',
     previous: "পূর্ববর্তী",
 
-    footerDesc: "myScheme হল একটি অফিসিয়াল জাতীয় প্ল্যাটফর্ম যা আপনার যোগ্যতার ভিত্তিতে সরকারি কল্যাণমূলক প্রকল্প এবং আর্থিক সহায়তা আবিষ্কারের জন্য নাগরিক-কেন্দ্রিক সেবা প্রদান করে।",
+    footerDesc: "Smart Sarkar Saathi (স্মার্ট সরকার সাথী) হল একটি অফিসিয়াল জাতীয় প্ল্যাটফর্ম যা আপনার যোগ্যতার ভিত্তিতে সরকারি কল্যাণমূলক প্রকল্প এবং আর্থিক সহায়তা আবিষ্কারের জন্য নাগরিক-কেন্দ্রিক সেবা প্রদান করে।",
     officialGovPortal15: "অফিসিয়াল সরকারি পোর্টাল • ১৫টি যাচাইকৃত জাতীয় প্রকল্প",
     goiPortalsTitle: "ভারত সরকারের গুরুত্বপূর্ণ পোর্টাল",
     nationalPortalOfIndia: "ভারতের জাতীয় পোর্টাল",
@@ -1783,7 +1783,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     next: 'அடுத்து',
     previous: "முந்தைய",
 
-    footerDesc: "myScheme என்பது உங்கள் தகுதியின் அடிப்படையில் அரசு நலத்திட்டங்கள் மற்றும் நிதி ஆதரவைக் கண்டறிய குடிமக்கள் மைய சேவையை வழங்கும் அதிகாரப்பூர்வ தேசிய தளமாகும்.",
+    footerDesc: "Smart Sarkar Saathi (ஸ்மார்ட் சர்க்கார் சாத்தி) என்பது உங்கள் தகுதியின் அடிப்படையில் அரசு நலத்திட்டங்கள் மற்றும் நிதி ஆதரவைக் கண்டறிய குடிமக்கள் மைய சேவையை வழங்கும் அதிகாரப்பூர்வ தேசிய தளமாகும்.",
     officialGovPortal15: "அதிகாரப்பூர்வ அரசு தளம் • 15 சரிபார்க்கப்பட்ட தேசிய திட்டங்கள்",
     goiPortalsTitle: "இந்திய அரசு இணையதளங்கள்",
     nationalPortalOfIndia: "இந்தியாவின் தேசிய தளம்",
@@ -2063,7 +2063,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     next: 'తరువాత',
     previous: "మునుపటి",
 
-    footerDesc: "myScheme అనేది మీ అర్హత ఆధారంగా ప్రభుత్వ సంక్షేమ పథకాలు మరియు ఆర్థిక సహాయాన్ని కనుగొనడానికి పౌర-కేంద్రీకృత సేవలను అందించే అధికారిక జాతీయ వేదిక.",
+    footerDesc: "Smart Sarkar Saathi (స్మార్ట్ సర్కార్ సాథీ) అనేది మీ అర్హత ఆధారంగా ప్రభుత్వ సంక్షేమ పథకాలు మరియు ఆర్థిక సహాయాన్ని కనుగొనడానికి పౌర-కేంద్రీకృత సేవలను అందించే అధికారిక జాతీయ వేదిక.",
     officialGovPortal15: "అధికారిక ప్రభుత్వ పోర్టల్ • 15 ధృవీకరించబడిన జాతీయ పథకాలు",
     goiPortalsTitle: "భారత ప్రభుత్వ పోర్టల్‌లు",
     nationalPortalOfIndia: "భారత జాతీయ పోర్టల్",

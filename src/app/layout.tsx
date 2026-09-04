@@ -8,16 +8,18 @@ import { AccessibilityWidget } from '@/components/accessibility-widget';
 import { GlobalChatBot } from '@/components/global-chat-bot';
 
 export const metadata: Metadata = {
-  title: 'myScheme — National Platform for Government Schemes & Services',
+  title: 'Smart Sarkar Saathi — National Platform for Government Schemes & Services',
   description:
-    'A language-agnostic government scheme discovery portal with deterministic eligibility verification and multilingual citizen assistance.',
+    'Smart Sarkar Saathi — A language-agnostic government scheme discovery portal with deterministic eligibility verification and multilingual citizen assistance.',
   keywords: [
+    'Smart Sarkar Saathi',
     'myScheme',
     'Government Schemes',
     'PM-KISAN',
     'Ayushman Bharat',
     'Scholarship',
-    'Citizen Portal'
+    'Citizen Portal',
+    'Digital India'
   ]
 };
 

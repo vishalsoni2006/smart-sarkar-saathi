@@ -19,8 +19,8 @@ export function Footer() {
                 <Landmark className="w-6 h-6" />
               </div>
               <div className="flex items-baseline">
-                <span className="text-2xl font-black text-white">my</span>
-                <span className="text-2xl font-black text-blue-400">Scheme</span>
+                <span className="text-2xl font-black text-white">Smart Sarkar</span>
+                <span className="ml-1 text-2xl font-black text-amber-400">Saathi</span>
                 <span className="ml-2 text-xs font-bold px-2 py-0.5 rounded-sm bg-white/10 text-slate-200">
                   AI Navigator
                 </span>
@@ -28,7 +28,7 @@ export function Footer() {
             </div>
 
             <p className="text-xs sm:text-sm leading-relaxed text-slate-300 max-w-md">
-              {t('footerDesc', 'myScheme is an official National Platform providing an innovative, citizen-centric service to discover government welfare schemes and financial support based on your eligibility.')}
+              {t('footerDesc', 'Smart Sarkar Saathi is an official National Platform providing an innovative, citizen-centric service to discover government welfare schemes and financial support based on your eligibility.')}
             </p>
 
             <div className="flex items-center gap-2 text-xs font-bold text-blue-300">

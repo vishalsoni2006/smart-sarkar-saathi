@@ -100,7 +100,10 @@ export default function HomePage() {
               {/* Headline */}
               <div className="space-y-1">
                 <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-2xl font-black text-[#1E40AF] dark:text-[#60A5FA]">myScheme</span>
+                  <span className="text-2xl sm:text-3xl font-black tracking-tight">
+                    <span className="text-[#1E40AF] dark:text-[#60A5FA]">Smart Sarkar </span>
+                    <span className="text-[#EA580C]">Saathi</span>
+                  </span>
                   <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
                     {t('portalMotto')}
                   </span>
@@ -197,10 +200,10 @@ export default function HomePage() {
               <div className="relative w-full max-w-xl rounded-3xl overflow-hidden shadow-2xl bg-white/60 dark:bg-[#0D1E38]/80 backdrop-blur-xs border border-blue-200/70 dark:border-blue-900/50 p-2 sm:p-3 transition-all duration-300 hover:shadow-blue-500/15">
                 <div className="relative rounded-2xl overflow-hidden group">
                   <Image
-                    src="/images/myscheme_hero_banner.png"
-                    alt="myScheme Portal - Scheme.gov.in Aapke Liye. Hamesha. Farming, Education, Health, Housing"
-                    width={972}
-                    height={806}
+                    src="/images/smart_sarkar_saathi_banner.png"
+                    alt="Smart Sarkar Saathi Portal - Scheme.gov.in Aapke Liye. Hamesha. Farming, Education, Health, Housing"
+                    width={1200}
+                    height={896}
                     priority
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 600px"
                     className="w-full h-auto object-contain rounded-2xl transition-transform duration-500 group-hover:scale-[1.015]"
@@ -209,7 +212,7 @@ export default function HomePage() {
                   {/* Interactive Hotspot for Direct "Check Now" Link */}
                   <Link
                     href="/check-eligibility"
-                    className="absolute bottom-2.5 right-2.5 sm:bottom-4 sm:right-4 px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-[#1E40AF] hover:bg-[#1D4ED8] text-white font-black text-xs sm:text-sm shadow-lg shadow-blue-900/40 transition-all hover:scale-105 flex items-center gap-1.5 z-20 cursor-pointer"
+                    className="absolute bottom-2.5 right-2.5 sm:bottom-3 sm:right-4 px-4 py-2 sm:px-5 sm:py-2 rounded-xl bg-[#1E40AF] hover:bg-[#1D4ED8] text-white font-black text-xs sm:text-sm shadow-lg shadow-blue-900/40 transition-all hover:scale-105 flex items-center gap-1.5 z-20 cursor-pointer"
                   >
                     <span>{t('checkNowBtn')}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
