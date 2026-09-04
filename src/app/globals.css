@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+/* Enable class-based and data-attribute dark mode variant in Tailwind CSS v4 */
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
+
+@layer base {
+  :root {
+    /* White & Blue Official Government of India Palette */
+    --background: #ffffff;
+    --foreground: #0f172a;
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+    --popover: #ffffff;
+    --popover-foreground: #0f172a;
+    --primary: #1e40af; /* Government Royal Blue (#1E40AF) */
+    --primary-foreground: #ffffff;
+    --secondary: #0b1e36; /* Deep Ministry Navy (#0B1E36) */
+    --secondary-foreground: #ffffff;
+    --muted: #f8fafc;
+    --muted-foreground: #475569;
+    --accent: #eff6ff; /* Soft Light Blue Tint (#EFF6FF) */
+    --accent-foreground: #1e40af;
+    --destructive: #dc2626;
+    --destructive-foreground: #ffffff;
+    --border: #e2e8f0;
+    --input: #cbd5e1;
+    --ring: #2563eb;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    /* High-Contrast Government Midnight Blue Palette */
+    --background: #071324; /* Deep Sovereign Midnight Navy */
+    --foreground: #f8fafc;
+    --card: #0d1e38; /* Crisp Navy card surface */
+    --card-foreground: #f8fafc;
+    --popover: #0d1e38;
+    --popover-foreground: #f8fafc;
+    --primary: #3b82f6; /* Luminous Blue in dark mode */
+    --primary-foreground: #ffffff;
+    --secondary: #1e3a5f;
+    --secondary-foreground: #ffffff;
+    --muted: #0b182b;
+    --muted-foreground: #94a3b8;
+    --accent: #132a4a;
+    --accent-foreground: #93c5fd;
+    --destructive: #991b1b;
+    --destructive-foreground: #f8fafc;
+    --border: #1e3a5f;
+    --input: #1e3a5f;
+    --ring: #3b82f6;
+  }
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  min-height: 100vh;
+}
+
+/* Government of India Top Stripe */
+.goi-top-bar {
+  background-color: #0b1e36;
+  color: #e2e8f0;
+}
+
+/* Card Hover Lift & Border Accent */
+.myscheme-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.myscheme-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(30, 64, 175, 0.08), 0 8px 10px -6px rgba(30, 64, 175, 0.04);
+}
+
+/* Category Pill */
+.myscheme-pill {
+  transition: all 0.2s ease;
+}
+
+.myscheme-pill:hover {
+  background-color: #eff6ff;
+  border-color: #2563eb;
+  color: #1e40af;
+}
+
+.dark .myscheme-pill:hover {
+  background-color: #0d1e38;
+  border-color: #3b82f6;
+  color: #93c5fd;
+}
+
+/* Live Verdict Transition Animation */
+@keyframes verdictPulse {
+  0% { transform: scale(0.98); opacity: 0.8; }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-verdict-flip {
+  animation: verdictPulse 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Official Citizen Accessibility Features */
+html.font-size-large {
+  font-size: 112.5% !important;
+}
+
+html.font-size-larger {
+  font-size: 125% !important;
+}
+
+html.high-contrast {
+  filter: contrast(120%) brightness(102%);
+}
+
+.writing-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
