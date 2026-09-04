@@ -117,27 +117,108 @@ export function startVoiceRecognition(options: {
 }
 
 /**
- * Clean up text for natural, pleasant speech (removes asterisks, markdown, citations, URLs)
+ * Clean up text for natural, crystal-clear speech:
+ * - Strips all brackets (round, square, curly) so TTS NEVER speaks "bracket" or "parenthesis"
+ * - Removes markdown formatting, hashes, asterisks, divider rules
+ * - Removes emojis and pictorial icons so TTS never reads emoji names
+ * - Removes standalone URLs and technical web paths
+ * - Converts currency symbol ₹ into natural words (रुपये, টাকা, ரூபாய், రూపాయలు, Rupees)
+ * - Removes internal number commas so numbers are pronounced as complete quantities
+ * - Replaces colons, semicolons, and dashes with natural pauses
  */
-export function cleanTextForSpeech(text: string): string {
-  return text
-    // Remove markdown links e.g. [myScheme](url) -> myScheme
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    // Remove standalone URLs
-    .replace(/https?:\/\/\S+/g, '')
-    // Remove markdown citations e.g. [Excerpt 1 - ...]
-    .replace(/\[Excerpt\s*\d+[^\]]*\]/gi, '')
-    // Remove citation footnotes [1], [2]
-    .replace(/\[\d+\]/g, '')
-    // Remove bold and italic markdown asterisks
-    .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')
-    // Remove backticks
-    .replace(/`([^`]+)`/g, '$1')
-    // Remove bullet points and headers
-    .replace(/^[#\-\*\>]\s+/gm, '')
-    // Remove excessive symbols
-    .replace(/[~_=]/g, '')
-    .trim();
+export function cleanTextForSpeech(text: string, langCode?: string): string {
+  if (!text) return '';
+
+  let cleaned = text;
+
+  // 1. Remove markdown links e.g. [myScheme](url) -> keep text only
+  cleaned = cleaned.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+
+  // 2. Remove all URLs and web addresses (http, https, www, .gov.in, .nic.in, etc.)
+  cleaned = cleaned.replace(/https?:\/\/\S+/gi, '');
+  cleaned = cleaned.replace(/www\.[a-z0-9\-\.]+\.[a-z]{2,}/gi, '');
+  cleaned = cleaned.replace(/\b[a-z0-9\-\.]+\.(gov|nic|org|ac|edu)\.in\S*/gi, '');
+
+  // 3. Remove internal technical route paths e.g. /check-eligibility, /schemes/pm-kisan
+  cleaned = cleaned.replace(/\/(check-eligibility|occupation-questions|dashboard|saved|schemes\/[a-z0-9\-]+|login|onboarding)\S*/gi, '');
+
+  // 4. Remove citation tags e.g. [Excerpt 1 - ...], [संदर्भ: ...], [1], [2]
+  cleaned = cleaned.replace(/\[(?:Excerpt|संदर्भ|Citation|Ref)[^\]]*\]/gi, '');
+  cleaned = cleaned.replace(/\[\d+\]/g, '');
+
+  // 5. Remove all square brackets [ and ], curly braces { and }
+  cleaned = cleaned.replace(/[\[\]\{\}]/g, ' ');
+
+  // 6. Remove parentheses ( and ) completely so TTS NEVER speaks "bracket" or "parenthesis"
+  // e.g. (PM-KISAN) -> PM-KISAN, (DBT) -> DBT, (70+) -> 70+
+  cleaned = cleaned.replace(/[\(\)]/g, ' ');
+
+  // 7. Remove markdown headers, horizontal dividers and blockquotes
+  cleaned = cleaned.replace(/^[#\>\-\=\*\s]{2,}\s*/gm, '\n');
+  cleaned = cleaned.replace(/#{1,6}\s*/g, ' ');
+
+  // 8. Remove bold/italic markdown asterisks, underscores, and backticks
+  cleaned = cleaned.replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1');
+  cleaned = cleaned.replace(/_{1,3}([^_]+)_{1,3}/g, '$1');
+  cleaned = cleaned.replace(/`{1,3}([^`]+)`{1,3}/g, '$1');
+
+  // 9. Remove all emojis and miscellaneous pictographic symbols so TTS never reads them aloud
+  cleaned = cleaned.replace(/[\u{1F300}-\u{1FAFF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F1E0}-\u{1F1FF}]/gu, ' ');
+
+  // 10. Replace per-unit slashes before removing punctuation
+  cleaned = cleaned.replace(/\/year\b/gi, ' per year');
+  cleaned = cleaned.replace(/\/month\b/gi, ' per month');
+  cleaned = cleaned.replace(/\/वर्ष\b/g, ' प्रति वर्ष');
+  cleaned = cleaned.replace(/\/साल\b/g, ' प्रति साल');
+  cleaned = cleaned.replace(/\/माह\b/g, ' प्रति माह');
+  cleaned = cleaned.replace(/\/महिना\b/g, ' दरमहा');
+
+  // 11. Handle currency symbol ₹ with scale words like "लाख" or standalone amounts
+  const lang = (langCode || '').toLowerCase();
+  let currencyWord = 'रुपये';
+  if (lang === 'bn') currencyWord = 'টাকা';
+  else if (lang === 'ta') currencyWord = 'ரூபாய்';
+  else if (lang === 'te') currencyWord = 'రూపాయలు';
+  else if (lang === 'en') currencyWord = 'Rupees';
+
+  // Handle amounts like ₹2.5 Lakh or ₹२.५ लाख -> 2.5 लाख रुपये
+  cleaned = cleaned.replace(
+    /₹\s*([0-9०-९০-৯௦-౯௧-௯]+(?:\.[0-9०-९০-৯௦-౯௧-௯]+)?)\s*(लाख|करोड़|कोटी|हजार|হাজার|লাখ|லட்சம்|கோடி|లక్షల|కోట్ల|Lakh|Crore|Cr|k|M)(?=\s|[.,!?;)]|$)/gi,
+    `$1 $2 ${currencyWord} `
+  );
+
+  // Handle standalone amounts like ₹75,000 or ₹७५,००० -> 75000 रुपये
+  cleaned = cleaned.replace(/₹\s*([0-9०-९০-৯௦-౯௧-௯]+(?:[.,][0-9०-९০-৯௦-౯௧-௯]+)*)/g, (_, num) => {
+    const cleanNum = num.replace(/,/g, '');
+    return `${cleanNum} ${currencyWord} `;
+  });
+  cleaned = cleaned.replace(/₹/g, ` ${currencyWord} `);
+
+  // 12. Remove commas inside numbers (e.g. 1,25,000 -> 125000, १,२५,००० -> १२५०००)
+  cleaned = cleaned.replace(/([0-9०-९০-৯௦-౯௧-௯]+),([0-9०-९০-৯௦-౯௧-௯]+)/g, '$1$2');
+  cleaned = cleaned.replace(/([0-9०-९০-৯௦-౯௧-௯]+),([0-9०-९০-৯௦-౯௧-௯]+)/g, '$1$2');
+
+  // 13. Replace bullet point characters with natural sentence break
+  cleaned = cleaned.replace(/[•·●○■▪▫◆◇✦★☆✓✔☑]/g, '. ');
+
+  // 14. Turn hyphens inside words like PM-KISAN into space e.g. "PM KISAN" so TTS flows naturally
+  cleaned = cleaned.replace(/([a-zA-Z\u0900-\u097F\u0980-\u09FF\u0B80-\u0BFF\u0C00-\u0C7F])-([a-zA-Z\u0900-\u097F\u0980-\u09FF\u0B80-\u0BFF\u0C00-\u0C7F])/g, '$1 $2');
+
+  // 15. Clean punctuation symbols that TTS speaks aloud:
+  cleaned = cleaned.replace(/[:;]\s*/g, ', ');
+  cleaned = cleaned.replace(/[|\\\/~^%@+=<>«»"'"`]/g, ' ');
+  cleaned = cleaned.replace(/[-–—]{2,}/g, '. ');
+  cleaned = cleaned.replace(/\s*[-–—]\s*/g, ' ');
+
+  // 16. Remove trailing dangling labels where URLs were stripped
+  cleaned = cleaned.replace(/(?:अधिकृत पोर्टल|पोर्टल|आधिकारिक पोर्टल|ऑफिशियल पोर्टल|Official Portal|Apply Online|Website|विवरण|तपशील|Details at|Details)\s*[,.-]*\s*/gi, '');
+
+  // 17. Normalize punctuation and whitespace:
+  cleaned = cleaned.replace(/([^\d०-९০-৯௦-౯௧-௯\s])\s*\.+\s*/g, '$1. ');
+  cleaned = cleaned.replace(/[,，\s]*,+/g, ', ');
+  cleaned = cleaned.replace(/\s+/g, ' ');
+
+  return cleaned.trim();
 }
 
 /**
@@ -160,7 +241,7 @@ export function speakText(
   // Cancel any currently speaking audio
   window.speechSynthesis.cancel();
 
-  const cleaned = cleanTextForSpeech(text);
+  const cleaned = cleanTextForSpeech(text, options?.langCode);
   if (!cleaned) return;
 
   const utterance = new SpeechSynthesisUtterance(cleaned);
