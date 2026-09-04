@@ -13,13 +13,14 @@ export async function POST(req: NextRequest) {
       targetMissingField?: string | null;
     };
 
-    if (!userMessage || !schemeId) {
-      return NextResponse.json({ error: 'userMessage and schemeId are required' }, { status: 400 });
+    if (!userMessage) {
+      return NextResponse.json({ error: 'userMessage is required' }, { status: 400 });
     }
 
-    const scheme = VERIFIED_SCHEMES.find((s) => s.id === schemeId);
-    if (!scheme) {
-      return NextResponse.json({ error: 'Scheme not found in verified corpus' }, { status: 404 });
+    let scheme = VERIFIED_SCHEMES[0];
+    if (schemeId && schemeId !== 'all') {
+      const found = VERIFIED_SCHEMES.find((s) => s.id === schemeId);
+      if (found) scheme = found;
     }
 
     const response = await executeGroundedRAGChat({

@@ -1,6 +1,11 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import Groq from 'groq-sdk';
-import { retrieveRelevantChunks } from '@/lib/rag/vector-search';
+import {
+  retrieveRelevantChunks,
+  searchAllSchemes,
+  getSchemesForOccupation,
+  getPortalKnowledgeSummary
+} from '@/lib/rag/vector-search';
 import { Citation, Scheme, UserProfile } from '@/types';
 
 export interface ChatResponsePayload {
@@ -143,8 +148,18 @@ export async function executeGroundedRAGChat(params: {
   // 2. Detect language
   const detectedLang = detectIndianLanguage(userMessage);
 
-  // 3. Retrieve relevant chunks from scheme official knowledge base
-  const retrieved = retrieveRelevantChunks(userMessage, scheme, 3);
+  // 3. Check for occupational & multi-scheme recommendations
+  const matchedOccupationalSchemes = getSchemesForOccupation(userMessage);
+  const isOccupationalQuery = matchedOccupationalSchemes.length > 0;
+
+  // Retrieve relevant chunks:
+  let retrieved = retrieveRelevantChunks(userMessage, scheme, 3);
+  if (retrieved.length === 0 || isOccupationalQuery) {
+    const globalRetrieved = searchAllSchemes(userMessage, 4);
+    if (globalRetrieved.length > 0) {
+      retrieved = globalRetrieved;
+    }
+  }
   const citations = retrieved.map((r) => r.citation);
 
   // 4. Check API keys
@@ -155,33 +170,36 @@ export async function executeGroundedRAGChat(params: {
   if (geminiKey) {
     try {
       const genAI = new GoogleGenerativeAI(geminiKey);
+      const portalKnowledge = getPortalKnowledgeSummary();
 
-      const prompt = `You are "Scheme Navigator AI", an official Government of India scheme assistance specialist.
-CRITICAL INSTRUCTIONS:
-1. Ground your answer STRICTLY on the retrieved official scheme excerpt provided below.
-2. If the user asks a question not addressed in the retrieved context, say clearly: "I don't have that information in the official scheme documentation for ${scheme.short_name}."
-3. Never guess or hallucinate eligibility verdicts.
-4. If the user message is in ${detectedLang.name} (or any other Indian language), respond naturally and accurately in the SAME language: ${detectedLang.name}.
-5. Keep your answer helpful, empathetic, concise, and citizen-friendly.
-6. Mention citation tag: "${citations.length > 0 ? citations[0].citation_label : scheme.short_name + ' Guidelines'}".
+      const prompt = `You are "Smart Sarkar Saathi" (myScheme AI Sovereign Navigator), an official Government of India scheme assistance specialist.
 
-CITIZEN PROFILE:
-- Name: ${profile?.name || 'Citizen'}
+KNOWLEDGE BASE OF ALL 15 VERIFIED SOVEREIGN SCHEMES & PORTAL CAPABILITIES:
+${portalKnowledge}
+
+RETRIEVED OFFICIAL GUIDELINE EXCERPTS:
+${retrieved.map((r, i) => `[Evidence ${i + 1} - ${r.citation.scheme_name} (${r.citation.section})]:\n${r.chunk.content}`).join('\n\n')}
+
+CITIZEN CONTEXT:
+- Active Scheme: ${scheme.name} (${scheme.short_name})
+- Citizen Name: ${profile?.name || 'Citizen'}
 - Occupation: ${profile?.occupation || 'General'}
-- Age: ${profile?.age || 'N/A'}
-- State of Residence: ${profile?.state || 'India'}
-- Annual Income: ₹${profile?.annual_income || 'N/A'}
+- State: ${profile?.state || 'India'}
+- Annual Income: ₹${profile?.annual_income || 'Not Specified'}
 - Verified Occupational Answers: ${profile?.occupation_specific_data ? JSON.stringify(profile.occupation_specific_data) : 'None'}
 
-SCHEME NAME: ${scheme.name} (${scheme.short_name})
-OFFICIAL APPLY URL: ${scheme.official_apply_url}
-REQUIRED DOCUMENTS: ${scheme.required_documents.join(', ')}
-
-RETRIEVED OFFICIAL CONTEXT:
-${retrieved.map((r, i) => `[Excerpt ${i + 1} - ${r.citation.citation_label}]:\n${r.chunk.content}`).join('\n\n')}
-
-CITIZEN'S QUESTION:
+CITIZEN'S QUERY:
 "${userMessage}"
+
+CRITICAL INSTRUCTIONS:
+1. RECOMMEND SCHEMES: When asked about schemes for an occupation, profession, or group (e.g. students, farmers, youth, entrepreneurs, street vendors, unorganized workers, senior citizens, women, persons with disability):
+   - RECOMMEND AND LIST ALL relevant schemes from the 15 verified schemes in the knowledge base (e.g. for students: PM-YASASVI and Post-Matric Scholarship; for farmers: PM-KISAN, PM MUDRA, PMMSY; for vendors: PM SVANidhi and PM-SYM; for business/unemployed: PMEGP and PM MUDRA; for senior citizens: Ayushman Bharat 70+ and Atal Pension Yojana / IGNOAPS).
+   - For each recommended scheme, provide: Scheme Name, Financial Benefits, Key Eligibility Criteria, and How to Apply / Official Portal.
+2. SCHEME SPECIFIC QUESTIONS: When asked about a specific scheme, verify required documents, application steps, benefit amounts, and eligibility rules grounded in the official excerpts.
+3. PORTAL QUESTIONS: If the citizen asks how this website/portal works or how to check eligibility, explain the 1-click Eligibility Engine (/check-eligibility), Occupation Questionnaire (/occupation-questions), and 15 Schemes Directory (/dashboard).
+4. MULTILINGUAL: Respond naturally, politely, and accurately in the citizen's detected language: ${detectedLang.name} (e.g. English, Hindi, Marathi, Bengali, Tamil, Telugu).
+5. FORMAT: Use clean bullet points, bold headings, and clear citizen-friendly advice.
+6. NEVER REFUSE TO ANSWER: Do NOT say you lack information if the question can be addressed from the 15 schemes knowledge base or portal capabilities.
 
 ANSWER (in ${detectedLang.name}):`;
 
@@ -278,7 +296,7 @@ function buildDeterministicGroundedAnswer(params: {
   const q = userMessage.toLowerCase();
   const userName = profile?.name ? ` ${profile.name}` : '';
 
-  // If user answered the missing field
+  // 1. If user answered the missing field follow-up
   if (fieldUpdate) {
     if (langCode === 'hi') {
       return `धन्यवाद${userName}! आपकी जानकारी दर्ज कर ली गई है (${fieldUpdate.displayNotice})। आपकी पात्रता की पुनः गणना की जा रही है।`;
@@ -286,7 +304,118 @@ function buildDeterministicGroundedAnswer(params: {
     return `Thank you${userName}! Your information has been recorded (${fieldUpdate.displayNotice}). The rule engine has instantly re-evaluated your eligibility.`;
   }
 
-  // Check for Documents question
+  // 2. Student & Scholarship Recommendation
+  if (
+    q.includes('student') ||
+    q.includes('scholarship') ||
+    q.includes('study') ||
+    q.includes('college') ||
+    q.includes('school') ||
+    q.includes('छात्र') ||
+    q.includes('विद्यार्थी') ||
+    q.includes('पढ़ाई') ||
+    q.includes('शिष्यवृत्ती')
+  ) {
+    if (langCode === 'hi') {
+      return `विद्यार्थियों और छात्रों के लिए प्रमुख सरकारी कल्याणकारी योजनाएं:\n\n1. 🎓 **PM-YASASVI (पीएम यशस्वी छात्रवृत्ति योजना)**:\n• लाभ: कक्षा 9-10 के लिए ₹75,000/वर्ष और कक्षा 11-12 के लिए ₹1,25,000/वर्ष की छात्रवृत्ति।\n• पात्रता: OBC, EBC और DNT श्रेणी के छात्र, पारिवारिक वार्षिक आय ₹2.5 लाख से कम।\n• आधिकारिक पोर्टल: https://yet.nta.ac.in | विवरण: /schemes/pm-yasasvi\n\n2. 🎓 **Post-Matric Scholarship (पोस्ट-मैट्रिक छात्रवृत्ति)**:\n• लाभ: 100% अनिवार्य शैक्षणिक शुल्क की प्रतिपूर्ति + मासिक निर्वाह भत्ता।\n• पात्रता: कक्षा 11 से लेकर स्नातक, स्नातकोत्तर, आईटीआई और डिप्लोमा छात्र (SC/OBC/EBC)।\n• आधिकारिक पोर्टल: https://scholarships.gov.in | विवरण: /schemes/post-matric-scholarship\n\n💡 आप पोर्टल के "पात्रता जांचें" (/check-eligibility) पृष्ठ पर अपनी व्यक्तिगत पात्रता 1-क्लिक में जांच सकते हैं!`;
+    }
+    if (langCode === 'mr') {
+      return `विद्यार्थ्यांसाठी प्रमुख शासकीय शिष्यवृत्ती योजना:\n\n1. 🎓 **PM-YASASVI (पीएम यशस्वी योजना)**:\n• लाभ: इयत्ता 9-10 साठी ₹75,000/वर्ष आणि इयत्ता 11-12 साठी ₹1,25,000/वर्ष शिष्यवृत्ती.\n• पात्रता: OBC, EBC आणि DNT प्रवर्गातील विद्यार्थी, कौटुंबिक वार्षिक उत्पन्न ₹2.5 लाखांपर्यंत.\n• अधिकृत पोर्टल: https://yet.nta.ac.in | तपशील: /schemes/pm-yasasvi\n\n2. 🎓 **Post-Matric Scholarship (पोस्ट-मॅट्रिक शिष्यवृत्ती)**:\n• लाभ: 100% अनिवार्य शैक्षणिक शुल्क प्रतिपूर्ती + मासिक निर्वाह भत्ता.\n• पात्रता: इयत्ता 11 वी ते पदवी, पदव्युत्तर, आयटीआय आणि डिप्लोमा विद्यार्थी (SC/OBC/EBC).\n• अधिकृत पोर्टल: https://scholarships.gov.in | तपशील: /schemes/post-matric-scholarship\n\n💡 आपण /check-eligibility टॅबवर जाऊन 1 सेकंदात स्वतःची पात्रता तपासू शकता!`;
+    }
+    return `Top Government Schemes for Students:\n\n1. 🎓 **PM-YASASVI (Young Achievers Scholarship Award Scheme)**:\n• Financial Benefit: ₹75,000/year for Class 9-10 and ₹1,25,000/year for Class 11-12 top-class school students.\n• Eligibility: Meritorious students from OBC, EBC, and DNT categories with family annual income up to ₹2.5 Lakh.\n• Apply Online: https://yet.nta.ac.in | Portal details: /schemes/pm-yasasvi\n\n2. 🎓 **Post-Matric Scholarship (SC/OBC/EBC/DNT)**:\n• Financial Benefit: 100% compulsory tuition fee reimbursement + monthly maintenance allowance (₹2,500 to ₹13,500/year).\n• Eligibility: Students in recognized post-matric courses (Class 11, 12, Degree, PG, ITI, Diploma, Ph.D.).\n• Apply Online: https://scholarships.gov.in | Portal details: /schemes/post-matric-scholarship\n\n💡 Tip: Check your personal eligibility across all schemes instantly at /check-eligibility!`;
+  }
+
+  // 3. Farmer & Agriculture Recommendation
+  if (
+    q.includes('farm') ||
+    q.includes('kisan') ||
+    q.includes('crop') ||
+    q.includes('agriculture') ||
+    q.includes('land') ||
+    q.includes('किसान') ||
+    q.includes('खेती') ||
+    q.includes('कृषि') ||
+    q.includes('शेतकरी')
+  ) {
+    if (langCode === 'hi') {
+      return `किसानों और कृषकों के लिए प्रमुख सरकारी योजनाएं:\n\n1. 🌾 **PM-KISAN (प्रधानमंत्री किसान सम्मान निधि)**:\n• लाभ: ₹6,000 प्रति वर्ष DBT के माध्यम से ₹2,000 की 3 समान किस्तों में बैंक खाते में।\n• पात्रता: कृषि योग्य भूमि के स्वामी किसान परिवार।\n• आधिकारिक पोर्टल: https://pmkisan.gov.in | विवरण: /schemes/pm-kisan\n\n2. 🌾 **PM MUDRA Yojana (मुद्रा योजना)**:\n• लाभ: कृषि उपकरण, डेयरी, पोल्ट्री व संबद्ध कृषि कार्यों के लिए बिना गारंटी ₹20 लाख तक का ऋण।\n• आधिकारिक पोर्टल: https://www.mudra.org.in | विवरण: /schemes/pm-mudra\n\n3. 🐟 **PMMSY (मत्स्य संपदा योजना)**:\n• लाभ: मत्स्य पालन, बायोफ्लोक व आधुनिक नावों के लिए ₹30 लाख तक की वित्तीय सहायता/सब्सिडी।\n• आधिकारिक पोर्टल: https://pmmsy.dof.gov.in | विवरण: /schemes/pmmsy`;
+    }
+    return `Top Government Schemes for Farmers:\n\n1. 🌾 **PM-KISAN (Pradhan Mantri Kisan Samman Nidhi)**:\n• Benefit: Direct income support of ₹6,000 per year transferred into bank accounts in 3 four-monthly installments of ₹2,000 via DBT.\n• Eligibility: Landholding farmer families with valid cultivable land records.\n• Apply Online: https://pmkisan.gov.in | Portal details: /schemes/pm-kisan\n\n2. 🌾 **PM MUDRA Yojana (PMMY)**:\n• Benefit: Collateral-free business & allied agricultural credit up to ₹20 Lakh.\n• Apply Online: https://www.mudra.org.in | Portal details: /schemes/pm-mudra\n\n3. 🐟 **PMMSY (Matsya Sampada Yojana)**:\n• Benefit: Up to ₹30 Lakh financial assistance and subsidy for aquaculture, fish farming ponds, boats, and cold storage.\n• Apply Online: https://pmmsy.dof.gov.in | Portal details: /schemes/pmmsy`;
+  }
+
+  // 4. Street Vendors & Hawkers Recommendation
+  if (
+    q.includes('vendor') ||
+    q.includes('hawker') ||
+    q.includes('thela') ||
+    q.includes('street') ||
+    q.includes('फेरीवाले') ||
+    q.includes('ठेले') ||
+    q.includes('रेहड़ी') ||
+    q.includes('पथविक्रेते')
+  ) {
+    if (langCode === 'hi') {
+      return `स्ट्रीट वेंडर्स (फेरीवालों और ठेलेवालों) के लिए प्रमुख योजनाएं:\n\n1. 🛒 **PM SVANidhi (पीएम स्वनिधि योजना)**:\n• लाभ: बिना किसी गारंटी के कार्यशील पूंजी ऋण (पहली किस्त ₹10,000, दूसरी ₹20,000, तीसरी ₹50,000)। 7% ब्याज सब्सिडी और डिजिटल लेनदेन पर प्रतिवर्ष ₹1,200 तक कैशबैक।\n• पात्रता: शहरी क्षेत्रों में वेंडिंग आईडी कार्ड / सर्टिफिकेट धारक वेंडर्स।\n• आधिकारिक पोर्टल: https://pmsvanidhi.mohua.gov.in | विवरण: /schemes/pm-svanidhi\n\n2. 🛒 **PM-SYM (श्रम योगी मानधन पेंशन)**:\n• लाभ: 60 वर्ष की आयु के बाद ₹3,000 प्रति माह आजीवन सुनिश्चित पेंशन।\n• पात्रता: 18-40 वर्ष आयु, मासिक आय ₹15,000 से कम।\n• आधिकारिक पोर्टल: https://maandhan.in | विवरण: /schemes/pm-sym`;
+    }
+    return `Top Government Schemes for Street Vendors & Hawkers:\n\n1. 🛒 **PM SVANidhi (PM Street Vendor's AtmaNirbhar Nidhi)**:\n• Benefit: Collateral-free working capital loan: 1st tranche ₹10,000; 2nd tranche ₹20,000; 3rd tranche ₹50,000 with 7% interest subsidy & digital UPI cashbacks.\n• Eligibility: Urban street vendors and hawkers with a Certificate of Vending (CoV) / Identity Card.\n• Apply Online: https://pmsvanidhi.mohua.gov.in | Portal details: /schemes/pm-svanidhi\n\n2. 🛒 **PM-SYM (Pradhan Mantri Shram Yogi Maandhan)**:\n• Benefit: Guaranteed lifelong pension of ₹3,000 per month after age 60.\n• Eligibility: Unorganized workers aged 18-40 with monthly income ≤ ₹15,000.\n• Apply Online: https://maandhan.in | Portal details: /schemes/pm-sym`;
+  }
+
+  // 5. Business / Entrepreneur / Unemployed / Youth Recommendation
+  if (
+    q.includes('business') ||
+    q.includes('startup') ||
+    q.includes('loan') ||
+    q.includes('entrepreneur') ||
+    q.includes('unemployed') ||
+    q.includes('youth') ||
+    q.includes('job') ||
+    q.includes('व्यवसाय') ||
+    q.includes('उद्योजक') ||
+    q.includes('रोजगार') ||
+    q.includes('बेरोजगार') ||
+    q.includes('उद्योग')
+  ) {
+    if (langCode === 'hi') {
+      return `व्यवसाय, उद्योग और स्वरोजगार के लिए प्रमुख सरकारी योजनाएं:\n\n1. 💼 **PMEGP (प्रधानमंत्री रोजगार सृजन कार्यक्रम)**:\n• लाभ: विनिर्माण में ₹50 लाख तक और सेवा क्षेत्र में ₹20 लाख तक की परियोजनाओं पर 15% से 35% तक सरकारी सब्सिडी (मार्जिन मनी)।\n• पात्रता: 18 वर्ष से अधिक आयु का कोई भी नागरिक (न्यूनतम 8वीं पास विनिर्माण में ₹10L+ के लिए)।\n• आधिकारिक पोर्टल: https://www.kviconline.gov.in/pmegpep/ | विवरण: /schemes/pmegp\n\n2. 💼 **PM MUDRA Yojana (मुद्रा योजना)**:\n• लाभ: गैर-कॉर्पोरेट सूक्ष्म उद्यमों के लिए बिना किसी गारंटी ₹20 लाख तक का ऋण (शिशु: ₹50K, किशोर: ₹5L, तरुण: ₹20L)।\n• आधिकारिक पोर्टल: https://www.mudra.org.in | विवरण: /schemes/pm-mudra`;
+    }
+    return `Top Government Schemes for Businesses, Startups & Self-Employment:\n\n1. 💼 **PMEGP (Prime Minister's Employment Generation Programme)**:\n• Benefit: 15% to 35% government capital subsidy on project loans up to ₹50 Lakh (Manufacturing) and ₹20 Lakh (Services).\n• Eligibility: Any citizen aged 18+ initiating a new enterprise (min 8th pass for large manufacturing projects).\n• Apply Online: https://www.kviconline.gov.in/pmegpep/ | Portal details: /schemes/pmegp\n\n2. 💼 **PM MUDRA Yojana (PMMY)**:\n• Benefit: 100% collateral-free business loans up to ₹20 Lakh (Shishu up to ₹50K, Kishore up to ₹5L, Tarun up to ₹20L).\n• Apply Online: https://www.mudra.org.in | Portal details: /schemes/pm-mudra`;
+  }
+
+  // 6. Senior Citizens & Pension Recommendation
+  if (
+    q.includes('senior') ||
+    q.includes('old age') ||
+    q.includes('pension') ||
+    q.includes('elderly') ||
+    q.includes('बुजुर्ग') ||
+    q.includes('वृद्ध') ||
+    q.includes('पेंशन') ||
+    q.includes('वय')
+  ) {
+    if (langCode === 'hi') {
+      return `वरिष्ठ नागरिकों और बुजुर्गों के लिए प्रमुख योजनाएं:\n\n1. 🏥 **Ayushman Bharat PM-JAY (वरिष्ठ नागरिक 70+)**:\n• लाभ: 70 वर्ष व उससे अधिक आयु के सभी वरिष्ठ नागरिकों के लिए ₹5 लाख का निःशुल्क कैशलेस स्वास्थ्य बीमा (आयुष्मान वय वंदना कार्ड), बिना किसी आय सीमा के।\n• आधिकारिक पोर्टल: https://pmjay.gov.in | विवरण: /schemes/ab-pmjay\n\n2. 👴 **Atal Pension Yojana (अटल पेंशन योजना)**:\n• लाभ: 60 वर्ष की आयु के बाद ₹1,000 से ₹5,000 प्रति माह की गारंटीड आजीवन पेंशन।\n• पात्रता: 18-40 वर्ष आयु वर्ग के सभी बैंक खाताधारक नागरिक।\n• आधिकारिक पोर्टल: https://npscra.nsdl.co.in | विवरण: /schemes/atal-pension-yojana\n\n3. 👴 **IGNOAPS (राष्ट्रीय वृद्धावस्था पेंशन योजना)**:\n• लाभ: BPL बुजुर्गों को प्रति माह ₹200 से ₹500 तक पेंशन + राज्य सरकार का अतिरिक्त अंशदान।\n• आधिकारिक पोर्टल: https://nsap.nic.in | विवरण: /schemes/ignoaps-pension`;
+    }
+    return `Top Government Schemes for Senior Citizens:\n\n1. 🏥 **Ayushman Bharat PM-JAY (Senior Citizens 70+)**:\n• Benefit: Free cashless health insurance cover up to ₹5 Lakh/year for ALL citizens aged 70+ (Ayushman Vaya Vandana Card), regardless of income.\n• Apply Online: https://pmjay.gov.in | Portal details: /schemes/ab-pmjay\n\n2. 👴 **Atal Pension Yojana (APY)**:\n• Benefit: Guaranteed monthly pension of ₹1,000 to ₹5,000 after age 60.\n• Apply Online: Any bank branch / https://npscra.nsdl.co.in | Details: /schemes/atal-pension-yojana\n\n3. 👴 **IGNOAPS (Indira Gandhi National Old Age Pension)**:\n• Benefit: Monthly pension for BPL senior citizens aged 60+.\n• Details: /schemes/ignoaps-pension`;
+  }
+
+  // 7. Portal Help & How to Check Eligibility
+  if (
+    q.includes('portal') ||
+    q.includes('how to check') ||
+    q.includes('eligibility') ||
+    q.includes('website') ||
+    q.includes('saathi') ||
+    q.includes('पात्रता') ||
+    q.includes('वेबसाइट') ||
+    q.includes('साथी')
+  ) {
+    if (langCode === 'hi') {
+      return `स्मार्ट सरकार साथी पोर्टल पर आपका स्वागत है! इस पोर्टल पर आप निम्नलिखित सुविधाएं प्राप्त कर सकते हैं:\n\n1. 🎯 **1-क्लिक पात्रता जांच (/check-eligibility)**: अपनी आयु, वार्षिक आय, व्यवसाय, जाति श्रेणी और राज्य दर्ज करें और 1 सेकंड में जानें कि आप किन-किन योजनाओं के लिए पात्र हैं।\n2. 📋 **व्यवसाय-आधारित प्रश्नावली (/occupation-questions)**: किसान, छात्र, व्यापारी आदि के लिए विशिष्ट प्रश्न जो आपकी सटीक पात्रता सुनिश्चित करते हैं।\n3. 📚 **15 योजनाओं की सम्पूर्ण डायरेक्टरी (/dashboard)**: सभी सत्यापित केंद्रीय योजनाओं की विस्तृत जानकारी, पात्रता नियम और आवश्यक दस्तावेज।\n4. 🔖 **बुकमार्क और सेव (/saved)**: अपनी पसंदीदा योजनाओं को सेव करें।\n5. 🎙️ **क्षेत्रीय वॉयस मोड**: हिंदी, मराठी, बंगाली, तमिल, तेलुगु या अंग्रेजी में माइक से बोलकर पूछें और आवाज में उत्तर सुनें!`;
+    }
+    return `Welcome to Smart Sarkar Saathi! Here is how our portal empowers you:\n\n1. 🎯 **1-Click Eligibility Engine (/check-eligibility)**: Enter your age, income, occupation, category, and state to instantly evaluate criteria against all 15 sovereign schemes.\n2. 📋 **Occupation Questionnaire (/occupation-questions)**: Targeted questions for 12+ professions (farmers, students, vendors, etc.) to resolve missing criteria.\n3. 📚 **15 Schemes Directory (/dashboard)**: Complete directory of all verified schemes with search and category filters.\n4. 🔖 **Saved Schemes (/saved)**: Bookmark schemes directly to your profile.\n5. 🎙️ **Multilingual Regional Voice Assistant**: Tap the mic button to speak in Hindi, Marathi, Bengali, Tamil, Telugu, or English and listen to spoken answers!`;
+  }
+
+  // 8. Documents question for active scheme
   if (q.includes('doc') || q.includes('paper') || q.includes('दस्तावेज') || q.includes('कागजात') || q.includes('proof')) {
     if (langCode === 'hi') {
       return `${scheme.short_name} के लिए आवश्यक आधिकारिक दस्तावेज निम्नलिखित हैं:\n• ${scheme.required_documents.join('\n• ')}\n\n(संदर्भ: ${scheme.short_name} दिशानिर्देश)`;
@@ -294,7 +423,7 @@ function buildDeterministicGroundedAnswer(params: {
     return `The official documents required for ${scheme.short_name} are:\n• ${scheme.required_documents.join('\n• ')}\n\n(Official Source: ${scheme.short_name} Checklist)`;
   }
 
-  // Check for How to Apply / Official Portal question
+  // 9. How to Apply / Official Portal question for active scheme
   if (q.includes('apply') || q.includes('how') || q.includes('portal') || q.includes('आवेदन') || q.includes('रजिस्ट्रेशन')) {
     const steps = scheme.application_steps ? scheme.application_steps.map((s, i) => `${i + 1}. ${s}`).join('\n') : '';
     if (langCode === 'hi') {
@@ -303,7 +432,7 @@ function buildDeterministicGroundedAnswer(params: {
     return `You can apply directly on the official portal at ${scheme.official_apply_url}.\n\nStep-by-step process:\n${steps}`;
   }
 
-  // Check for Benefits question
+  // 10. Benefits question for active scheme
   if (q.includes('benefit') || q.includes('money') || q.includes('amount') || q.includes('लाभ') || q.includes('रुपये') || q.includes('पैसे')) {
     if (langCode === 'hi') {
       return `${scheme.short_name} के मुख्य लाभ:\n${scheme.benefit_summary}\n\nविस्तार:\n• ${scheme.benefit_details.join('\n• ')}`;
@@ -311,7 +440,7 @@ function buildDeterministicGroundedAnswer(params: {
     return `Key benefits under ${scheme.short_name}:\n${scheme.benefit_summary}\n\nDetails:\n• ${scheme.benefit_details.join('\n• ')}`;
   }
 
-  // If chunks were retrieved
+  // 11. If chunks were retrieved
   if (retrieved.length > 0) {
     const topChunk = retrieved[0].chunk;
     if (langCode === 'hi') {
@@ -320,11 +449,11 @@ function buildDeterministicGroundedAnswer(params: {
     return `According to the official scheme guidelines [${topChunk.citation_tag}]:\n\n${topChunk.content}\n\nFor official procedures, visit: ${scheme.official_apply_url}`;
   }
 
-  // Fallback: strictly avoid hallucination
+  // 12. Fallback: suggest portal schemes rather than failing
   if (langCode === 'hi') {
-    return `मुझे ${scheme.short_name} के आधिकारिक दस्तावेजों में इस प्रश्न की पुष्टि नहीं मिली। कृपया आधिकारिक हेल्पलाइन (${scheme.official_contact || '1800 हेल्पलाइन'}) अथवा आधिकारिक पोर्टल (${scheme.official_apply_url}) पर संपर्क करें।`;
+    return `नमस्ते! आप भारत सरकार की 15 सत्यापित योजनाओं में से किसी भी योजना (जैसे PM-KISAN, आयुष्मान भारत, पीएम स्वनिधि, मुद्रा, पीएम-यशस्वी) के बारे में पूछ सकते हैं। आप अपनी संपूर्ण पात्रता जांचने के लिए "पात्रता जांचें" (/check-eligibility) पर जा सकते हैं।`;
   }
-  return `I don't have that specific information in the official scheme documentation for ${scheme.short_name}. Please refer directly to the official portal: ${scheme.official_apply_url} or contact ${scheme.official_contact || 'the respective ministry'}.`;
+  return `Namaste! I am your AI Sarkar Saathi. You can ask about any of our 15 verified Government of India schemes (e.g. PM-KISAN for farmers, PM-YASASVI for students, PM SVANidhi for vendors, PM MUDRA for businesses, Ayushman Bharat for health) or check your personalized eligibility at /check-eligibility!`;
 }
 
 function getSuggestedPrompts(scheme: Scheme, langCode: string): string[] {

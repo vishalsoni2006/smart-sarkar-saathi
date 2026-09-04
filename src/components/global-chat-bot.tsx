@@ -5,6 +5,7 @@ import { Bot, X, Send, Mic, Volume2, VolumeX, Sparkles, BookOpen, ExternalLink, 
 import { VERIFIED_SCHEMES } from '@/data/schemes';
 import { executeGroundedRAGChat } from '@/lib/llm/client';
 import { getActiveGeminiKey } from '@/lib/llm/gemini-config';
+import { getSchemesForOccupation } from '@/lib/rag/vector-search';
 import { useLanguage } from '@/components/language-provider';
 import { ApiConfigModal } from '@/components/api-config-modal';
 import {
@@ -57,10 +58,11 @@ export function GlobalChatBot() {
             'नमस्ते! I am your AI Sarkar Saathi (सरकारी साथी). Ask me about any Government of India scheme in Hindi, Marathi, Bengali, Tamil, Telugu, or English. You can tap the Mic button to speak in your regional language!',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           suggested_prompts: [
-            'किसान सम्मान निधि के लिए कौन पात्र है?',
-            'आयुष्मान भारत कार्ड कैसे बनवाएं?',
-            'What schemes are available for small farmers?',
-            'महिलांसाठी कोणत्या योजना आहेत?'
+            'What are the best yojnas for students?',
+            'What schemes are for farmers?',
+            'फेरीवालों (Street Vendors) के लिए कौनसी योजना है?',
+            'स्वरोजगार और व्यापार के लिए योजनाएं',
+            'वरिष्ठ नागरिकों (70+) के लिए स्वास्थ्य योजना'
           ]
         }
       ]);
@@ -135,15 +137,20 @@ export function GlobalChatBot() {
       targetScheme =
         VERIFIED_SCHEMES.find((s) => s.id === selectedSchemeId) || VERIFIED_SCHEMES[0];
     } else {
-      // Find best matching scheme from query words or default to PM-KISAN
-      const q = query.toLowerCase();
-      const match = VERIFIED_SCHEMES.find(
-        (s) =>
-          q.includes(s.short_name.toLowerCase()) ||
-          q.includes(s.name.toLowerCase()) ||
-          s.occupation_tags.some((tag) => q.includes(tag.toLowerCase()))
-      );
-      targetScheme = match || VERIFIED_SCHEMES[0];
+      // Check occupational match first so queries like "schemes for student" match student schemes
+      const occupationalMatches = getSchemesForOccupation(query);
+      if (occupationalMatches.length > 0) {
+        targetScheme = occupationalMatches[0];
+      } else {
+        const q = query.toLowerCase();
+        const match = VERIFIED_SCHEMES.find(
+          (s) =>
+            q.includes(s.short_name.toLowerCase()) ||
+            q.includes(s.name.toLowerCase()) ||
+            s.occupation_tags.some((tag) => q.includes(tag.toLowerCase()))
+        );
+        targetScheme = match || VERIFIED_SCHEMES[0];
+      }
     }
 
     const userMsg: ChatMessage = {
@@ -467,6 +474,45 @@ export function GlobalChatBot() {
               </button>
             </div>
           )}
+
+          {/* Quick Topic Chips for Students, Farmers, Vendors, Business */}
+          <div className="px-3 pt-2 pb-1 bg-slate-50 dark:bg-[#0B1E36] border-t border-slate-200/60 dark:border-slate-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px]">
+            <button
+              type="button"
+              onClick={() => handleSend('What are the best yojnas for students?')}
+              className="whitespace-nowrap px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-[#1E40AF] dark:text-blue-300 font-bold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
+            >
+              🎓 Students (विद्यार्थी)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSend('What are the best schemes for farmers?')}
+              className="whitespace-nowrap px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors cursor-pointer"
+            >
+              🌾 Farmers (किसान)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSend('What schemes are for street vendors and hawkers?')}
+              className="whitespace-nowrap px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 font-bold hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors cursor-pointer"
+            >
+              🛒 Street Vendors (फेरीवाले)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSend('What schemes are for business, youth, and startups?')}
+              className="whitespace-nowrap px-2.5 py-1 rounded-full bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-bold hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors cursor-pointer"
+            >
+              💼 Business & Youth (रोजगार)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSend('What schemes are available for senior citizens aged 70+?')}
+              className="whitespace-nowrap px-2.5 py-1 rounded-full bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-bold hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer"
+            >
+              👴 Senior Citizens 70+ (बुजुर्ग)
+            </button>
+          </div>
 
           {/* Chat Input Bar with Mic */}
           <form
