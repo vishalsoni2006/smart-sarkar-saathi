@@ -16,8 +16,116 @@ import {
 } from '@/lib/voice/speech';
 import { ChatMessage, Citation, Scheme } from '@/types';
 
+const WELCOME_MESSAGES: Record<string, { content: string; prompts: string[] }> = {
+  hi: {
+    content: 'नमस्ते! मैं आपका AI सरकार साथी हूँ। आप भारत सरकार की किसी भी योजना के बारे में हिंदी में पूछ सकते हैं या माइक से बोल सकते हैं! आपके सभी उत्तर हिंदी में मिलेंगे।',
+    prompts: [
+      'विद्यार्थियों के लिए कौन सी योजनाएं सबसे अच्छी हैं?',
+      'किसान भाइयों के लिए कौनसी योजनाएं हैं?',
+      'फेरीवालों (Street Vendors) के लिए योजनाएं',
+      'स्वरोजगार और व्यापार के लिए योजनाएं',
+      'वरिष्ठ नागरिकों (70+) के लिए स्वास्थ्य योजना'
+    ]
+  },
+  mr: {
+    content: 'नमस्कार! मी आपला AI सरकार साथी आहे. आपण केंद्र सरकारच्या कोणत्याही योजनेबद्दल मराठीत विचारू शकता किंवा माइकद्वारे बोलू शकता! आपली सर्व उत्तरे मराठीतच मिळतील.',
+    prompts: [
+      'विद्यार्थ्यांसाठी कोणत्या योजना सर्वात चांगल्या आहेत?',
+      'शेतकऱ्यांसाठी कोणत्या योजना आहेत?',
+      'फेरीवाले आणि पथविक्रेत्यांसाठी योजना',
+      'व्यवसाय आणि तरुणांसाठी कर्ज योजना',
+      '७० वर्षांवरील ज्येष्ठ नागरिकांसाठी आरोग्य योजना'
+    ]
+  },
+  bn: {
+    content: 'নমস্কার! আমি আপনার AI সরকার সাথী। ভারত সরকারের যেকোনো যোজনা সম্পর্কে বাংলায় প্রশ্ন করুন বা মাইকে বলুন! আপনার সমস্ত উত্তর বাংলায় দেওয়া হবে।',
+    prompts: [
+      'শিক্ষার্থীদের জন্য সেরা সরকারি যোজনা কী কী?',
+      'কৃষকদের জন্য সেরা সরকারি প্রকল্পগুলি কী কী?',
+      'হকার ও পথ বিক্রেতাদের জন্য কী কী স্কিম আছে?',
+      'ব্যবসা ও যুবকদের জন্য স্বরোজগার ঋণ যোজনা',
+      '৭০ বছরের বেশি প্রবীণদের জন্য স্বাস্থ্য প্রকল্প'
+    ]
+  },
+  ta: {
+    content: 'வணக்கம்! நான் உங்கள் AI அரசு தோழன் (Sarkar Saathi). மத்திய அரசு திட்டங்கள் பற்றி தமிழில் கேளுங்கள் அல்லது மைக்கில் பேசுங்கள்! உங்கள் பதில்கள் அனைத்தும் தமிழிலேயே வழங்கப்படும்.',
+    prompts: [
+      'மாணவர்களுக்கான சிறந்த திட்டங்கள் எவை?',
+      'விவசாயிகளுக்கான சிறந்த அரசு திட்டங்கள் எவை?',
+      'சாலையோர வியாபாரிகளுக்கான அரசு கடனுதவி',
+      'தொழில் தொடங்க இளைஞர்களுக்கான முத்ரா கடன்',
+      '70 வயதுக்கு மேற்பட்ட முதியவர்களுக்கான ஆயுஷ்மான் பாரத்'
+    ]
+  },
+  te: {
+    content: 'నమస్కారం! నేను మీ AI సర్కార్ సాథీని. భారత ప్రభుత్వ పథకాల గురించి తెలుగులో అడగండి లేదా మైక్‌లో మాట్లాడండి! మీ సమాధానాలన్నీ తెలుగులోనే లభిస్తాయి.',
+    prompts: [
+      'విద్యార్థుల కోసం ఉత్తమ పథకాలు ఏమిటి?',
+      'రైతుల కోసం ఉత్తమ ప్రభుత్వ పథకాలు ఏమిటి?',
+      'వీధి వ్యాపారుల కోసం పీఎం స్వనిధి పథకం',
+      'యువత మరియు వ్యాపారం కోసం రుణాలు',
+      '70 ఏళ్లు పైబడిన సీనియర్ సిటిజన్లకు ఆయుష్మాన్ భారత్'
+    ]
+  },
+  en: {
+    content: 'Namaste! I am your AI Sarkar Saathi. Ask me about any Government of India scheme or tap the mic to speak. Answers will be provided in your selected language!',
+    prompts: [
+      'What are the best yojnas for students?',
+      'What schemes are for farmers?',
+      'What schemes are for street vendors?',
+      'What schemes are for business & startups?',
+      'What schemes are available for senior citizens 70+?'
+    ]
+  }
+};
+
+const TOPIC_CHIPS: Record<string, { label: string; query: string }[]> = {
+  hi: [
+    { label: '🎓 विद्यार्थी (Scholarships)', query: 'विद्यार्थियों के लिए कौन सी योजनाएं सबसे अच्छी हैं?' },
+    { label: '🌾 किसान (कृषि व DBT)', query: 'किसान भाइयों के लिए कौनसी योजनाएं सबसे अच्छी हैं?' },
+    { label: '🛒 फेरीवाले (Street Vendors)', query: 'फेरीवालों और रेहड़ी-पटरी वालों के लिए कौनसी योजनाएं हैं?' },
+    { label: '💼 स्वरोजगार व व्यापार', query: 'व्यापार, स्वरोजगार और युवाओं के लिए कौनसी योजनाएं हैं?' },
+    { label: '👴 वरिष्ठ नागरिक 70+', query: '70 वर्ष से अधिक उम्र के बुजुर्गों और वरिष्ठ नागरिकों के लिए कौनसी योजनाएं हैं?' }
+  ],
+  mr: [
+    { label: '🎓 विद्यार्थी (शिष्यवृत्ती)', query: 'विद्यार्थ्यांसाठी कोणत्या योजना सर्वात चांगल्या आहेत?' },
+    { label: '🌾 शेतकरी (कृषी व DBT)', query: 'शेतकऱ्यांसाठी कोणत्या योजना सर्वात चांगल्या आहेत?' },
+    { label: '🛒 पथविक्रेते (फेरीवाले)', query: 'फेरीवाले आणि पथविक्रेत्यांसाठी कोणत्या योजना आहेत?' },
+    { label: '💼 व्यवसाय व तरुण', query: 'व्यवसाय, स्टार्टअप आणि तरुणांसाठी कोणत्या योजना आहेत?' },
+    { label: '👴 ज्येष्ठ नागरिक 70+', query: '70 वर्षांवरील ज्येष्ठ नागरिकांसाठी कोणत्या योजना आहेत?' }
+  ],
+  bn: [
+    { label: '🎓 শিক্ষার্থী (স্কলারশিপ)', query: 'শিক্ষার্থীদের জন্য সেরা সরকারি যোজনা কী কী?' },
+    { label: '🌾 কৃষক (কৃষি সহায়তা)', query: 'কৃষকদের জন্য সেরা সরকারি যোজনাগুলি কী কী?' },
+    { label: '🛒 হকার ও বিক্রেতা', query: 'হকার এবং পথ বিক্রেতাদের জন্য কী কী স্কিম আছে?' },
+    { label: '💼 ব্যবসা ও কর্মসংস্থান', query: 'ব্যবসা ও যুবকদের জন্য সেরা স্কিম কী কী?' },
+    { label: '👴 প্রবীণ নাগরিক 70+', query: '৭০ বছর বা তার বেশি বয়সী প্রবীণদের জন্য কী কী প্রকল্প আছে?' }
+  ],
+  ta: [
+    { label: '🎓 மாணவர்கள் (கல்வி)', query: 'மாணவர்களுக்கான சிறந்த திட்டங்கள் எவை?' },
+    { label: '🌾 விவசாயிகள் (விவசாயம்)', query: 'விவசாயிகளுக்கான சிறந்த அரசு திட்டங்கள் எவை?' },
+    { label: '🛒 சாலையோர வியாபாரி', query: 'சாலையோர வியாபாரிகளுக்கான திட்டங்கள் எவை?' },
+    { label: '💼 தொழில் & இளைஞர்', query: 'தொழில் மற்றும் இளைஞர்களுக்கான சிறந்த திட்டங்கள் எவை?' },
+    { label: '👴 மூத்த குடிமக்கள் 70+', query: '70 வயதுக்கு மேற்பட்ட மூத்த குடிமக்களுக்கான திட்டங்கள் எவை?' }
+  ],
+  te: [
+    { label: '🎓 విద్యార్థులు (చదువు)', query: 'విద్యార్థుల కోసం ఉత్తమ పథకాలు ఏమిటి?' },
+    { label: '🌾 రైతులు (వ్యవసాయం)', query: 'రైతుల కోసం ఉత్తమ ప్రభుత్వ పథకాలు ఏమిటి?' },
+    { label: '🛒 వీధి వ్యాపారులు', query: 'వీధి వ్యాపారుల కోసం ఏ పథకాలు ఉన్నాయి?' },
+    { label: '💼 వ్యాపారం & యువత', query: 'వ్యాపారం మరియు యువత కోసం ఉత్తమ పథకాలు ఏవి?' },
+    { label: '👴 సీనియర్ సిటిజన్లు 70+', query: '70 ఏళ్లు పైబడిన వృద్ధుల కోసం ఏ పథకాలు ఉన్నాయి?' }
+  ],
+  en: [
+    { label: '🎓 Students (Scholarships)', query: 'What are the best yojnas for students?' },
+    { label: '🌾 Farmers (Agriculture)', query: 'What are the best schemes for farmers?' },
+    { label: '🛒 Street Vendors (Hawkers)', query: 'What schemes are for street vendors and hawkers?' },
+    { label: '💼 Business & Youth', query: 'What schemes are for business, youth, and startups?' },
+    { label: '👴 Senior Citizens 70+', query: 'What schemes are available for senior citizens aged 70+?' }
+  ]
+};
+
 export function GlobalChatBot() {
-  const { language, t } = useLanguage();
+  const { language, t, setLanguage } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedSchemeId, setSelectedSchemeId] = useState<string>('all');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -47,43 +155,47 @@ export function GlobalChatBot() {
     return () => window.removeEventListener('scheme_navigator_api_keys_changed', handleKeyChange);
   }, []);
 
+  const handleLanguageChange = (newLang: string) => {
+    setSpeechLang(newLang as any);
+    if (['hi', 'mr', 'bn', 'ta', 'te', 'en'].includes(newLang)) {
+      setLanguage(newLang as any);
+    }
+    // Update welcome message if conversation is fresh
+    if (messages.length <= 1) {
+      const welcome = WELCOME_MESSAGES[newLang] || WELCOME_MESSAGES.hi;
+      setMessages([
+        {
+          id: `welcome-${Date.now()}`,
+          role: 'assistant',
+          content: welcome.content,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          suggested_prompts: welcome.prompts
+        }
+      ]);
+    }
+  };
+
   // Initialize welcome message when opened
   useEffect(() => {
     if (messages.length === 0) {
+      const welcome = WELCOME_MESSAGES[speechLang] || WELCOME_MESSAGES.hi;
       setMessages([
         {
           id: 'welcome-1',
           role: 'assistant',
-          content:
-            'नमस्ते! I am your AI Sarkar Saathi (सरकारी साथी). Ask me about any Government of India scheme in Hindi, Marathi, Bengali, Tamil, Telugu, or English. You can tap the Mic button to speak in your regional language!',
+          content: welcome.content,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          suggested_prompts: [
-            'What are the best yojnas for students?',
-            'What schemes are for farmers?',
-            'फेरीवालों (Street Vendors) के लिए कौनसी योजना है?',
-            'स्वरोजगार और व्यापार के लिए योजनाएं',
-            'वरिष्ठ नागरिकों (70+) के लिए स्वास्थ्य योजना'
-          ]
+          suggested_prompts: welcome.prompts
         }
       ]);
     }
-  }, [messages.length]);
+  }, [messages.length, speechLang]);
 
   useEffect(() => {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, loading, isOpen]);
-
-  const getLangCodeFromName = (name?: string): string => {
-    const n = (name || '').toLowerCase();
-    if (n.includes('hindi')) return 'hi';
-    if (n.includes('marathi')) return 'mr';
-    if (n.includes('bengali')) return 'bn';
-    if (n.includes('tamil')) return 'ta';
-    if (n.includes('telugu')) return 'te';
-    return speechLang || 'en';
-  };
 
   const toggleListening = () => {
     if (isListening) {
@@ -110,7 +222,7 @@ export function GlobalChatBot() {
     recognitionRef.current = recognition;
   };
 
-  const toggleSpeakMessage = (msgId: string, content: string, langName?: string) => {
+  const toggleSpeakMessage = (msgId: string, content: string) => {
     if (activeSpeakingId === msgId) {
       stopSpeaking();
       setActiveSpeakingId(null);
@@ -120,7 +232,7 @@ export function GlobalChatBot() {
     stopSpeaking();
     setActiveSpeakingId(msgId);
     speakText(content, {
-      langCode: getLangCodeFromName(langName),
+      langCode: speechLang,
       onStart: () => setActiveSpeakingId(msgId),
       onEnd: () => setActiveSpeakingId(null),
       onError: () => setActiveSpeakingId(null)
@@ -168,7 +280,8 @@ export function GlobalChatBot() {
       const response = await executeGroundedRAGChat({
         userMessage: query,
         scheme: targetScheme,
-        profile: null
+        profile: null,
+        selectedLanguage: speechLang
       });
 
       const botMsg: ChatMessage = {
@@ -186,7 +299,7 @@ export function GlobalChatBot() {
       if (voiceMode) {
         setActiveSpeakingId(botMsg.id);
         speakText(botMsg.content, {
-          langCode: getLangCodeFromName(botMsg.detected_language),
+          langCode: speechLang,
           onStart: () => setActiveSpeakingId(botMsg.id),
           onEnd: () => setActiveSpeakingId(null),
           onError: () => setActiveSpeakingId(null)
@@ -198,7 +311,12 @@ export function GlobalChatBot() {
         {
           id: `bot-err-${Date.now()}`,
           role: 'assistant',
-          content: `Namaste! You can find verified guidelines at https://www.myscheme.gov.in or ask another question in your regional language.`,
+          content:
+            speechLang === 'hi'
+              ? 'नमस्ते! आप https://www.myscheme.gov.in पर आधिकारिक जानकारी देख सकते हैं।'
+              : speechLang === 'mr'
+              ? 'नमस्कार! आपण https://www.myscheme.gov.in वर अधिकृत माहिती पाहू शकता.'
+              : 'Namaste! You can find verified guidelines at https://www.myscheme.gov.in',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -303,24 +421,40 @@ export function GlobalChatBot() {
             </div>
           </div>
 
-          {/* Scheme Context Bar */}
-          <div className="px-3 py-2 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-              <Layers className="w-3.5 h-3.5 text-[#1E40AF] dark:text-blue-400" />
-              <span className="font-semibold text-[11px]">Scheme:</span>
+          {/* Scheme Context & Language Bar */}
+          <div className="px-3 py-2 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 text-xs">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <Layers className="w-3.5 h-3.5 text-[#1E40AF] dark:text-blue-400 shrink-0" />
+              <select
+                value={selectedSchemeId}
+                onChange={(e) => setSelectedSchemeId(e.target.value)}
+                className="w-full px-2 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate focus:outline-none"
+              >
+                <option value="all">🌟 All 15 Verified Schemes</option>
+                {VERIFIED_SCHEMES.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.short_name} — {s.name.slice(0, 22)}...
+                  </option>
+                ))}
+              </select>
             </div>
-            <select
-              value={selectedSchemeId}
-              onChange={(e) => setSelectedSchemeId(e.target.value)}
-              className="px-2 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-800 dark:text-slate-200 max-w-[240px] truncate focus:outline-none"
-            >
-              <option value="all">🌟 All 15 Verified Schemes (General)</option>
-              {VERIFIED_SCHEMES.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.short_name} — {s.name.slice(0, 32)}...
-                </option>
-              ))}
-            </select>
+
+            <div className="flex items-center gap-1 shrink-0">
+              <Globe className="w-3.5 h-3.5 text-blue-600 dark:text-amber-300 shrink-0" />
+              <select
+                value={speechLang}
+                onChange={(e) => handleLanguageChange(e.target.value)}
+                className="px-2 py-1 rounded-lg bg-white dark:bg-slate-800 border border-blue-400/50 dark:border-blue-700 text-[11px] font-black text-[#1E40AF] dark:text-amber-300 focus:outline-none cursor-pointer"
+                title="Select language for chat and voice answers"
+              >
+                <option value="hi">🇮🇳 हिंदी</option>
+                <option value="mr">🇮🇳 मराठी</option>
+                <option value="bn">🇮🇳 বাংলা</option>
+                <option value="ta">🇮🇳 தமிழ்</option>
+                <option value="te">🇮🇳 తెలుగు</option>
+                <option value="en">🇮🇳 English</option>
+              </select>
+            </div>
           </div>
 
           {/* Messages Container */}
@@ -389,7 +523,7 @@ export function GlobalChatBot() {
                         <button
                           type="button"
                           onClick={() =>
-                            toggleSpeakMessage(msg.id, msg.content, msg.detected_language)
+                            toggleSpeakMessage(msg.id, msg.content)
                           }
                           className={`flex items-center gap-1 font-semibold cursor-pointer ${
                             activeSpeakingId === msg.id
@@ -477,41 +611,16 @@ export function GlobalChatBot() {
 
           {/* Quick Topic Chips for Students, Farmers, Vendors, Business */}
           <div className="px-3 pt-2 pb-1 bg-slate-50 dark:bg-[#0B1E36] border-t border-slate-200/60 dark:border-slate-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px]">
-            <button
-              type="button"
-              onClick={() => handleSend('What are the best yojnas for students?')}
-              className="whitespace-nowrap px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-[#1E40AF] dark:text-blue-300 font-bold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
-            >
-              🎓 Students (विद्यार्थी)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSend('What are the best schemes for farmers?')}
-              className="whitespace-nowrap px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors cursor-pointer"
-            >
-              🌾 Farmers (किसान)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSend('What schemes are for street vendors and hawkers?')}
-              className="whitespace-nowrap px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 font-bold hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors cursor-pointer"
-            >
-              🛒 Street Vendors (फेरीवाले)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSend('What schemes are for business, youth, and startups?')}
-              className="whitespace-nowrap px-2.5 py-1 rounded-full bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-bold hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors cursor-pointer"
-            >
-              💼 Business & Youth (रोजगार)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSend('What schemes are available for senior citizens aged 70+?')}
-              className="whitespace-nowrap px-2.5 py-1 rounded-full bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-bold hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer"
-            >
-              👴 Senior Citizens 70+ (बुजुर्ग)
-            </button>
+            {(TOPIC_CHIPS[speechLang] || TOPIC_CHIPS.hi).map((chip, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => handleSend(chip.query)}
+                className="whitespace-nowrap px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-[#1E40AF] dark:text-blue-300 font-bold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors cursor-pointer"
+              >
+                {chip.label}
+              </button>
+            ))}
           </div>
 
           {/* Chat Input Bar with Mic */}
@@ -525,9 +634,9 @@ export function GlobalChatBot() {
             {/* Regional Voice Language Selector */}
             <select
               value={speechLang}
-              onChange={(e) => setSpeechLang(e.target.value as any)}
+              onChange={(e) => handleLanguageChange(e.target.value)}
               className="text-[11px] font-bold px-1.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer focus:outline-none"
-              title="Select speech language"
+              title="Select chat and speech language"
             >
               <option value="hi">हिंदी</option>
               <option value="mr">मराठी</option>
@@ -559,7 +668,19 @@ export function GlobalChatBot() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask scheme question or tap mic to speak..."
+              placeholder={
+                speechLang === 'hi'
+                  ? 'योजना संबंधी प्रश्न पूछें या माइक दबाएं...'
+                  : speechLang === 'mr'
+                  ? 'योजनेबद्दल प्रश्न विचारा किंवा माइकवर बोला...'
+                  : speechLang === 'bn'
+                  ? 'যোজনা সম্পর্কে জিজ্ঞাসা করুন বা বলুন...'
+                  : speechLang === 'ta'
+                  ? 'திட்டம் பற்றி கேட்கவும் அல்லது பேசவும்...'
+                  : speechLang === 'te'
+                  ? 'పథకం గురించి అడగండి లేదా మాట్లాడండి...'
+                  : 'Ask scheme question or tap mic to speak...'
+              }
               className="flex-1 px-3 py-2 text-xs rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-[#1E40AF] text-slate-900 dark:text-white"
             />
 

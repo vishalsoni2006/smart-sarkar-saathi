@@ -6,11 +6,12 @@ import { UserProfile } from '@/types';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { userMessage, schemeId, profile, targetMissingField } = body as {
+    const { userMessage, schemeId, profile, targetMissingField, selectedLanguage } = body as {
       userMessage: string;
-      schemeId: string;
+      schemeId?: string;
       profile: UserProfile | null;
       targetMissingField?: string | null;
+      selectedLanguage?: string | null;
     };
 
     if (!userMessage) {
@@ -27,7 +28,8 @@ export async function POST(req: NextRequest) {
       userMessage,
       scheme,
       profile,
-      targetMissingField
+      targetMissingField,
+      selectedLanguage
     });
 
     return NextResponse.json(response);

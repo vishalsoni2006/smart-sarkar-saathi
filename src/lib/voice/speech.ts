@@ -167,6 +167,8 @@ export function speakText(
 
   const targetBcp = options?.langCode && REGIONAL_SPEECH_LANGS[options.langCode]
     ? REGIONAL_SPEECH_LANGS[options.langCode].bcp47
+    : options?.langCode && options.langCode.includes('-')
+    ? options.langCode
     : 'hi-IN';
 
   utterance.lang = targetBcp;
@@ -176,9 +178,12 @@ export function speakText(
   // Attempt to select a regional voice if available
   const voices = window.speechSynthesis.getVoices();
   if (voices.length > 0) {
+    const langPrefix = targetBcp.split('-')[0].toLowerCase();
     const matchingVoice =
       voices.find((v) => v.lang.toLowerCase() === targetBcp.toLowerCase()) ||
-      voices.find((v) => v.lang.toLowerCase().startsWith(targetBcp.split('-')[0])) ||
+      voices.find((v) => v.lang.toLowerCase().replace('_', '-').startsWith(targetBcp.toLowerCase())) ||
+      voices.find((v) => v.lang.toLowerCase().startsWith(langPrefix)) ||
+      voices.find((v) => v.lang.toLowerCase().includes(langPrefix)) ||
       voices.find((v) => v.lang.includes('IN')) ||
       voices[0];
 

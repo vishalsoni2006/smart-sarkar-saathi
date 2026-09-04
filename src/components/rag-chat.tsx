@@ -45,7 +45,7 @@ export function RAGChat({
   targetMissingQuestion,
   onProfileUpdated
 }: RAGChatProps) {
-  const { language, t } = useLanguage();
+  const { language, t, setLanguage } = useLanguage();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -73,16 +73,6 @@ export function RAGChat({
     return () => window.removeEventListener('scheme_navigator_api_keys_changed', handleKeyChange);
   }, []);
 
-  const getLangCodeFromName = (name?: string): string => {
-    const n = (name || '').toLowerCase();
-    if (n.includes('hindi')) return 'hi';
-    if (n.includes('marathi')) return 'mr';
-    if (n.includes('bengali')) return 'bn';
-    if (n.includes('tamil')) return 'ta';
-    if (n.includes('telugu')) return 'te';
-    return speechLang || 'en';
-  };
-
   const toggleListening = () => {
     if (isListening) {
       recognitionRef.current?.stop();
@@ -108,7 +98,7 @@ export function RAGChat({
     recognitionRef.current = recognition;
   };
 
-  const toggleSpeakMessage = (msgId: string, content: string, langName?: string) => {
+  const toggleSpeakMessage = (msgId: string, content: string) => {
     if (activeSpeakingId === msgId) {
       stopSpeaking();
       setActiveSpeakingId(null);
@@ -118,7 +108,7 @@ export function RAGChat({
     stopSpeaking();
     setActiveSpeakingId(msgId);
     speakText(content, {
-      langCode: getLangCodeFromName(langName),
+      langCode: speechLang,
       onStart: () => setActiveSpeakingId(msgId),
       onEnd: () => setActiveSpeakingId(null),
       onError: () => setActiveSpeakingId(null)
@@ -187,7 +177,8 @@ export function RAGChat({
         userMessage: query,
         scheme,
         profile,
-        targetMissingField
+        targetMissingField,
+        selectedLanguage: speechLang
       });
 
       const botMsg: ChatMessage = {
@@ -203,11 +194,11 @@ export function RAGChat({
 
       setMessages((prev) => [...prev, botMsg]);
 
-      // If voice mode is active, speak the answer aloud in user's language
+      // If voice mode is active, speak the answer aloud in user's selected language
       if (voiceMode) {
         setActiveSpeakingId(botMsg.id);
         speakText(botMsg.content, {
-          langCode: getLangCodeFromName(botMsg.detected_language),
+          langCode: speechLang,
           onStart: () => setActiveSpeakingId(botMsg.id),
           onEnd: () => setActiveSpeakingId(null),
           onError: () => setActiveSpeakingId(null)
@@ -375,7 +366,7 @@ export function RAGChat({
                   {isBot && (
                     <button
                       type="button"
-                      onClick={() => toggleSpeakMessage(msg.id, msg.content, msg.detected_language)}
+                      onClick={() => toggleSpeakMessage(msg.id, msg.content)}
                       className={`p-1 rounded-md text-xs transition-colors cursor-pointer flex items-center gap-1 font-semibold ${
                         activeSpeakingId === msg.id
                           ? 'text-blue-600 bg-blue-100 dark:bg-blue-900/50 animate-pulse'
@@ -468,19 +459,25 @@ export function RAGChat({
         }}
         className="p-3 border-t border-slate-200 dark:border-blue-900/30 bg-white dark:bg-[#0D1E38] flex items-center gap-2"
       >
-        {/* Voice Language Selector */}
+        {/* Chat and Voice Language Selector */}
         <select
           value={speechLang}
-          onChange={(e) => setSpeechLang(e.target.value as any)}
-          className="hidden sm:block text-[11px] font-bold px-2 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer focus:outline-none"
-          title="Microphone input language"
+          onChange={(e) => {
+            const val = e.target.value;
+            setSpeechLang(val as any);
+            if (['hi', 'mr', 'bn', 'ta', 'te', 'en'].includes(val)) {
+              setLanguage(val as any);
+            }
+          }}
+          className="text-[11px] font-bold px-2 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer focus:outline-none"
+          title="Select chat and voice language"
         >
-          <option value="hi">हिंदी (Hindi)</option>
-          <option value="mr">मराठी (Marathi)</option>
-          <option value="bn">বাংলা (Bengali)</option>
-          <option value="ta">தமிழ் (Tamil)</option>
-          <option value="te">తెలుగు (Telugu)</option>
-          <option value="en">English (India)</option>
+          <option value="hi">🇮🇳 हिंदी</option>
+          <option value="mr">🇮🇳 मराठी</option>
+          <option value="bn">🇮🇳 বাংলা</option>
+          <option value="ta">🇮🇳 தமிழ்</option>
+          <option value="te">🇮🇳 తెలుగు</option>
+          <option value="en">🇮🇳 English</option>
         </select>
 
         {/* Microphone Button */}

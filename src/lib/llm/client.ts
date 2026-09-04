@@ -28,7 +28,7 @@ export function detectIndianLanguage(text: string): { code: string; name: string
   const bengaliRegex = /[\u0980-\u09FF]/;
   const tamilRegex = /[\u0B80-\u0BFF]/;
   const teluguRegex = /[\u0C00-\u0C7F]/;
-  const marathiMarkers = ['आहे', 'नाही', 'कसे', 'माहिती', 'योजना', 'अर्ज'];
+  const marathiMarkers = ['आहे', 'नाही', 'कसे', 'माहिती', 'योजना', 'अर्ज', 'शेतकरी', 'विद्यार्थी'];
 
   if (hindiRegex.test(text)) {
     for (const marker of marathiMarkers) {
@@ -41,6 +41,38 @@ export function detectIndianLanguage(text: string): { code: string; name: string
   if (teluguRegex.test(text)) return { code: 'te', name: 'Telugu' };
 
   return { code: 'en', name: 'English' };
+}
+
+/**
+ * Resolve target language prioritizing user's explicit selection from chatbot UI
+ */
+export function resolveTargetLanguage(
+  selectedLang?: string | null,
+  userMessage?: string
+): { code: string; name: string; nativeName: string } {
+  const code = (selectedLang || '').toLowerCase().trim();
+  if (code === 'hi' || code.includes('hindi')) return { code: 'hi', name: 'Hindi', nativeName: 'हिंदी' };
+  if (code === 'mr' || code.includes('marathi')) return { code: 'mr', name: 'Marathi', nativeName: 'मराठी' };
+  if (code === 'bn' || code.includes('bengali')) return { code: 'bn', name: 'Bengali', nativeName: 'বাংলা' };
+  if (code === 'ta' || code.includes('tamil')) return { code: 'ta', name: 'Tamil', nativeName: 'தமிழ்' };
+  if (code === 'te' || code.includes('telugu')) return { code: 'te', name: 'Telugu', nativeName: 'తెలుగు' };
+  if (code === 'en' || code.includes('english')) return { code: 'en', name: 'English', nativeName: 'English' };
+
+  if (userMessage) {
+    const detected = detectIndianLanguage(userMessage);
+    if (detected.code !== 'en') {
+      const nativeMap: Record<string, string> = {
+        hi: 'हिंदी',
+        mr: 'मराठी',
+        bn: 'বাংলা',
+        ta: 'தமிழ்',
+        te: 'తెలుగు'
+      };
+      return { ...detected, nativeName: nativeMap[detected.code] || detected.name };
+    }
+  }
+
+  return { code: 'hi', name: 'Hindi', nativeName: 'हिंदी' };
 }
 
 /**
@@ -139,14 +171,15 @@ export async function executeGroundedRAGChat(params: {
   scheme: Scheme;
   profile: UserProfile | null;
   targetMissingField?: string | null;
+  selectedLanguage?: string | null;
 }): Promise<ChatResponsePayload> {
-  const { userMessage, scheme, profile, targetMissingField } = params;
+  const { userMessage, scheme, profile, targetMissingField, selectedLanguage } = params;
 
   // 1. Check if user is responding to the missing field follow-up
   const fieldUpdate = extractFieldUpdate(userMessage, targetMissingField);
 
-  // 2. Detect language
-  const detectedLang = detectIndianLanguage(userMessage);
+  // 2. Resolve target language (honor explicit selection from chatbot UI)
+  const targetLang = resolveTargetLanguage(selectedLanguage, userMessage);
 
   // 3. Check for occupational & multi-scheme recommendations
   const matchedOccupationalSchemes = getSchemesForOccupation(userMessage);
@@ -191,17 +224,28 @@ CITIZEN CONTEXT:
 CITIZEN'S QUERY:
 "${userMessage}"
 
-CRITICAL INSTRUCTIONS:
+CRITICAL MANDATORY INSTRUCTION - CITIZEN'S SELECTED LANGUAGE:
+The citizen has explicitly chosen: ${targetLang.name} (${targetLang.nativeName}) with language code "${targetLang.code}".
+YOU MUST GENERATE YOUR ENTIRE ANSWER EXCLUSIVELY IN ${targetLang.name} (${targetLang.nativeName}).
+- If Hindi ('hi'): You MUST reply 100% in natural, fluent Hindi (Devanagari script).
+- If Marathi ('mr'): You MUST reply 100% in natural, fluent Marathi (मराठी लिपी, उदा. 'नमस्कार! विद्यार्थ्यांसाठी/शेतकऱ्यांसाठी खालील योजना आहेत...', 'पात्रता', 'लाभ', 'अर्ज कसा करावा').
+- If Bengali ('bn'): You MUST reply 100% in natural, fluent Bengali (বাংলা ভাষায়).
+- If Tamil ('ta'): You MUST reply 100% in natural, fluent Tamil (தமிழ் மொழியில்).
+- If Telugu ('te'): You MUST reply 100% in natural, fluent Telugu (తెలుగు భాషలో).
+- If English ('en'): You MUST reply in clear, standard English.
+
+DO NOT answer in English if the citizen selected ${targetLang.name}. Even if the query is in English (such as clicking an English chip or typing in English), TRANSLATE and provide all scheme details, benefits, eligibility, and links entirely in ${targetLang.name} (${targetLang.nativeName}).
+
+CORE INSTRUCTIONS:
 1. RECOMMEND SCHEMES: When asked about schemes for an occupation, profession, or group (e.g. students, farmers, youth, entrepreneurs, street vendors, unorganized workers, senior citizens, women, persons with disability):
    - RECOMMEND AND LIST ALL relevant schemes from the 15 verified schemes in the knowledge base (e.g. for students: PM-YASASVI and Post-Matric Scholarship; for farmers: PM-KISAN, PM MUDRA, PMMSY; for vendors: PM SVANidhi and PM-SYM; for business/unemployed: PMEGP and PM MUDRA; for senior citizens: Ayushman Bharat 70+ and Atal Pension Yojana / IGNOAPS).
    - For each recommended scheme, provide: Scheme Name, Financial Benefits, Key Eligibility Criteria, and How to Apply / Official Portal.
 2. SCHEME SPECIFIC QUESTIONS: When asked about a specific scheme, verify required documents, application steps, benefit amounts, and eligibility rules grounded in the official excerpts.
 3. PORTAL QUESTIONS: If the citizen asks how this website/portal works or how to check eligibility, explain the 1-click Eligibility Engine (/check-eligibility), Occupation Questionnaire (/occupation-questions), and 15 Schemes Directory (/dashboard).
-4. MULTILINGUAL: Respond naturally, politely, and accurately in the citizen's detected language: ${detectedLang.name} (e.g. English, Hindi, Marathi, Bengali, Tamil, Telugu).
-5. FORMAT: Use clean bullet points, bold headings, and clear citizen-friendly advice.
-6. NEVER REFUSE TO ANSWER: Do NOT say you lack information if the question can be addressed from the 15 schemes knowledge base or portal capabilities.
+4. FORMAT: Use clean bullet points, bold headings, and clear citizen-friendly advice.
+5. NEVER REFUSE TO ANSWER: Do NOT say you lack information if the question can be addressed from the 15 schemes knowledge base or portal capabilities.
 
-ANSWER (in ${detectedLang.name}):`;
+ANSWER (Entirely in ${targetLang.name} / ${targetLang.nativeName}):`;
 
       for (const modelName of CANDIDATE_GEMINI_MODELS) {
         try {
@@ -212,9 +256,9 @@ ANSWER (in ${detectedLang.name}):`;
           if (answerText) {
             return {
               answer: answerText,
-              detectedLanguage: detectedLang.name,
+              detectedLanguage: targetLang.name,
               citations,
-              suggestedPrompts: getSuggestedPrompts(scheme, detectedLang.code),
+              suggestedPrompts: getSuggestedPrompts(scheme, targetLang.code),
               fieldUpdated: fieldUpdate
             };
           }
@@ -236,7 +280,7 @@ ANSWER (in ${detectedLang.name}):`;
         messages: [
           {
             role: 'system',
-            content: `You are Scheme Navigator AI. Citizen is ${profile?.name || 'Citizen'} (${profile?.occupation || 'Citizen'}). Ground your answer ONLY in the official context for ${scheme.short_name}. Respond in ${detectedLang.name}.`
+            content: `You are Scheme Navigator AI. Citizen is ${profile?.name || 'Citizen'} (${profile?.occupation || 'Citizen'}). Ground your answer in official context. Respond EXCLUSIVELY in ${targetLang.name} (${targetLang.nativeName}).`
           },
           {
             role: 'user',
@@ -250,9 +294,9 @@ ANSWER (in ${detectedLang.name}):`;
       const groqAnswer = completion.choices[0]?.message?.content || '';
       return {
         answer: groqAnswer,
-        detectedLanguage: detectedLang.name,
+        detectedLanguage: targetLang.name,
         citations,
-        suggestedPrompts: getSuggestedPrompts(scheme, detectedLang.code),
+        suggestedPrompts: getSuggestedPrompts(scheme, targetLang.code),
         fieldUpdated: fieldUpdate
       };
     } catch (e) {
@@ -266,16 +310,16 @@ ANSWER (in ${detectedLang.name}):`;
     scheme,
     profile,
     retrieved,
-    langCode: detectedLang.code,
-    langName: detectedLang.name,
+    langCode: targetLang.code,
+    langName: targetLang.name,
     fieldUpdate
   });
 
   return {
     answer: groundedAnswer,
-    detectedLanguage: detectedLang.name,
+    detectedLanguage: targetLang.name,
     citations,
-    suggestedPrompts: getSuggestedPrompts(scheme, detectedLang.code),
+    suggestedPrompts: getSuggestedPrompts(scheme, targetLang.code),
     fieldUpdated: fieldUpdate
   };
 }
@@ -335,10 +379,25 @@ function buildDeterministicGroundedAnswer(params: {
     q.includes('किसान') ||
     q.includes('खेती') ||
     q.includes('कृषि') ||
-    q.includes('शेतकरी')
+    q.includes('शेतकरी') ||
+    q.includes('কৃষক') ||
+    q.includes('விவசாயி') ||
+    q.includes('రైతు')
   ) {
     if (langCode === 'hi') {
       return `किसानों और कृषकों के लिए प्रमुख सरकारी योजनाएं:\n\n1. 🌾 **PM-KISAN (प्रधानमंत्री किसान सम्मान निधि)**:\n• लाभ: ₹6,000 प्रति वर्ष DBT के माध्यम से ₹2,000 की 3 समान किस्तों में बैंक खाते में।\n• पात्रता: कृषि योग्य भूमि के स्वामी किसान परिवार।\n• आधिकारिक पोर्टल: https://pmkisan.gov.in | विवरण: /schemes/pm-kisan\n\n2. 🌾 **PM MUDRA Yojana (मुद्रा योजना)**:\n• लाभ: कृषि उपकरण, डेयरी, पोल्ट्री व संबद्ध कृषि कार्यों के लिए बिना गारंटी ₹20 लाख तक का ऋण।\n• आधिकारिक पोर्टल: https://www.mudra.org.in | विवरण: /schemes/pm-mudra\n\n3. 🐟 **PMMSY (मत्स्य संपदा योजना)**:\n• लाभ: मत्स्य पालन, बायोफ्लोक व आधुनिक नावों के लिए ₹30 लाख तक की वित्तीय सहायता/सब्सिडी।\n• आधिकारिक पोर्टल: https://pmmsy.dof.gov.in | विवरण: /schemes/pmmsy`;
+    }
+    if (langCode === 'mr') {
+      return `शेतकरी बांधवांसाठी केंद्र सरकारच्या प्रमुख कल्याणकारी योजना:\n\n1. 🌾 **PM-KISAN (प्रधानमंत्री किसान सन्मान निधी)**:\n• लाभ: पात्र शेतकऱ्यांना दरवर्षी ₹६,००० ची थेट आर्थिक मदत (३ हप्त्यांमध्ये DBT द्वारे थेट बँक खात्यात).\n• पात्रता: स्वतःच्या नावावर शेतीयोग्य जमीन असणारे शेतकरी कुटुंब.\n• अधिकृत पोर्टल: https://pmkisan.gov.in | तपशील: /schemes/pm-kisan\n\n2. 🌾 **PM MUDRA Yojana (मुद्रा योजना)**:\n• लाभ: शेतीपूरक व्यवसाय, डेअरी, कुक्कुटपालन व अवजारांसाठी विनातारण ₹२० लाखांपर्यंत कर्ज.\n• अधिकृत पोर्टल: https://www.mudra.org.in | तपशील: /schemes/pm-mudra\n\n3. 🐟 **PMMSY (मत्स्य संपदा योजना)**:\n• लाभ: मत्स्यपालन, तळी व आधुनिक बोटींसाठी ₹३० लाखांपर्यंत अनुदान.\n• अधिकृत पोर्टल: https://pmmsy.dof.gov.in | तपशील: /schemes/pmmsy`;
+    }
+    if (langCode === 'bn') {
+      return `কৃষক ভাইদের জন্য ভারত সরকারের শীর্ষ কল্যাণমূলক প্রকল্প:\n\n1. 🌾 **PM-KISAN (প্রধানমন্ত্রী কিষাণ সম্মান নিধি)**:\n• সুবিধা: যোগ্য কৃষকদের প্রতি বছর ₹৬,০০০ টাকার আর্থিক সহায়তা (৩টি কিস্তিতে DBT মাধ্যমে সরাসরি ব্যাংক একাউন্টে)।\n• যোগ্যতা: নিজের নামে চাষযোগ্য জমি থাকা কৃষক পরিবার।\n• অফিশিয়াল পোর্টাল: https://pmkisan.gov.in | বিস্তারিত: /schemes/pm-kisan\n\n2. 🌾 **PM MUDRA (প্রধানমন্ত্রী মুদ্রা যোজনা)**:\n• সুবিধা: কৃষিভিত্তিক ব্যবসা ও দুগ্ধজাত কাজের জন্য কোনো গ্যারান্টি ছাড়াই ₹২০ লক্ষ পর্যন্ত ঋণ।\n• অফিশিয়াল পোর্টাল: https://www.mudra.org.in | বিস্তারিত: /schemes/pm-mudra\n\n3. 🐟 **PMMSY (মৎস্য সম্পদ যোজনা)**:\n• সুবিধা: মৎস্য চাষ ও আধুনিক সরঞ্জামের জন্য ₹৩০ লক্ষ পর্যন্ত সরকারি ভর্তুকি।`;
+    }
+    if (langCode === 'ta') {
+      return `விவசாயிகளுக்கான மத்திய அரசின் சிறந்த நலத்திட்டங்கள்:\n\n1. 🌾 **PM-KISAN (பிரதான் மந்திரி கிசான் சம்மான் நிதி)**:\n• பயன்கள்: தகுதியுள்ள விவசாயிகளுக்கு ஆண்டுக்கு ₹6,000 நேரடி பண உதவி (3 தவணைகளில் DBT மூலம் வங்கி கணக்கில்).\n• தகுதி: விவசாய நிலம் வைத்துள்ள விவசாயிகள் குடும்பம்.\n• அதிகாரப்பூர்வ தளம்: https://pmkisan.gov.in | விவரங்கள்: /schemes/pm-kisan\n\n2. 🌾 **PM MUDRA (முத்ரா திட்டம்)**:\n• பயன்கள்: விவசாயம் மற்றும் கால்நடை வணிகத்திற்கு ₹20 லட்சம் வரை பிணையற்ற கடன்.\n• அதிகாரப்பூர்வ தளம்: https://www.mudra.org.in\n\n3. 🐟 **PMMSY (மத்ஸ்ய சம்பதா யோஜனா)**:\n• பயன்கள்: மீன் வளர்ப்பு மற்றும் படகுகளுக்கு ₹30 லட்சம் வரை மானியம்.`;
+    }
+    if (langCode === 'te') {
+      return `రైతుల కోసం కేంద్ర ప్రభుత్వ ముఖ్య పథకాలు:\n\n1. 🌾 **PM-KISAN (పీఎం కిసాన్ సమ్మాన్ నిధి)**:\n• ప్రయోజనం: అర్హులైన రైతులకు ఏడాదికి ₹6,000 నేరుగా ఖాతాలో జమ (3 విడతలలో DBT ద్వారా).\n• అర్హత: సాగుభూమి కలిగి ఉన్న రైతు కుటుంబాలు.\n• అధికారిక పోర్టల్: https://pmkisan.gov.in | వివరాలు: /schemes/pm-kisan\n\n2. 🌾 **PM MUDRA (పీఎం ముద్ర యోజన)**:\n• ప్రయోజనం: వ్యవసాయ అనుబంధ పనుల కోసం పూచీకత్తు లేకుండా ₹20 లక్షల వరకు రుణం.\n• అధికారిక పోర్టల్: https://www.mudra.org.in\n\n3. 🐟 **PMMSY (మత్స్య సంపద యోజన)**:\n• ప్రయోజనం: చేపల పెంపకం మరియు పరికరాల కోసం ₹30 లక్షల వరకు సబ్సిడీ.`;
     }
     return `Top Government Schemes for Farmers:\n\n1. 🌾 **PM-KISAN (Pradhan Mantri Kisan Samman Nidhi)**:\n• Benefit: Direct income support of ₹6,000 per year transferred into bank accounts in 3 four-monthly installments of ₹2,000 via DBT.\n• Eligibility: Landholding farmer families with valid cultivable land records.\n• Apply Online: https://pmkisan.gov.in | Portal details: /schemes/pm-kisan\n\n2. 🌾 **PM MUDRA Yojana (PMMY)**:\n• Benefit: Collateral-free business & allied agricultural credit up to ₹20 Lakh.\n• Apply Online: https://www.mudra.org.in | Portal details: /schemes/pm-mudra\n\n3. 🐟 **PMMSY (Matsya Sampada Yojana)**:\n• Benefit: Up to ₹30 Lakh financial assistance and subsidy for aquaculture, fish farming ponds, boats, and cold storage.\n• Apply Online: https://pmmsy.dof.gov.in | Portal details: /schemes/pmmsy`;
   }
@@ -356,6 +415,18 @@ function buildDeterministicGroundedAnswer(params: {
   ) {
     if (langCode === 'hi') {
       return `स्ट्रीट वेंडर्स (फेरीवालों और ठेलेवालों) के लिए प्रमुख योजनाएं:\n\n1. 🛒 **PM SVANidhi (पीएम स्वनिधि योजना)**:\n• लाभ: बिना किसी गारंटी के कार्यशील पूंजी ऋण (पहली किस्त ₹10,000, दूसरी ₹20,000, तीसरी ₹50,000)। 7% ब्याज सब्सिडी और डिजिटल लेनदेन पर प्रतिवर्ष ₹1,200 तक कैशबैक।\n• पात्रता: शहरी क्षेत्रों में वेंडिंग आईडी कार्ड / सर्टिफिकेट धारक वेंडर्स।\n• आधिकारिक पोर्टल: https://pmsvanidhi.mohua.gov.in | विवरण: /schemes/pm-svanidhi\n\n2. 🛒 **PM-SYM (श्रम योगी मानधन पेंशन)**:\n• लाभ: 60 वर्ष की आयु के बाद ₹3,000 प्रति माह आजीवन सुनिश्चित पेंशन।\n• पात्रता: 18-40 वर्ष आयु, मासिक आय ₹15,000 से कम।\n• आधिकारिक पोर्टल: https://maandhan.in | विवरण: /schemes/pm-sym`;
+    }
+    if (langCode === 'mr') {
+      return `पथविक्रेते आणि फेरीवाल्यांसाठी प्रमुख सरकारी योजना:\n\n1. 🛒 **PM SVANidhi (पीएम स्वनिधी योजना)**:\n• लाभ: विनातारण खेळते भांडवल कर्ज (पहिला हप्ता ₹१०,०००, दुसरा ₹२०,०००, तिसरा ₹५०,०००). वेळेवर परतफेडीवर ७% व्याज अनुदान आणि डिजिटल व्यवहारांवर ₹१,२०० पर्यंत कॅशबॅक.\n• पात्रता: शहरी भागातील नोंदणीकृत फेरीवाले व पथविक्रेते.\n• अधिकृत पोर्टल: https://pmsvanidhi.mohua.gov.in | तपशील: /schemes/pm-svanidhi\n\n2. 🛒 **PM-SYM (श्रम योगी मानधन पेन्शन योजना)**:\n• लाभ: वयाच्या ६० वर्षांनंतर दरमहा ₹३,००० ची खात्रीशीर पेन्शन.\n• पात्रता: १८ ते ४० वर्षे वयोगट, मासिक उत्पन्न ₹१५,००० पेक्षा कमी असणारे असंघटित कामगार.\n• अधिकृत पोर्टल: https://maandhan.in | तपशील: /schemes/pm-sym`;
+    }
+    if (langCode === 'bn') {
+      return `পথ বিক্রেতা ও হকারদের জন্য শীর্ষ সরকারি প্রকল্প:\n\n1. 🛒 **PM SVANidhi (পিএম স্বনিধি যোজনা)**:\n• সুবিধা: কোনো গ্যারান্টি ছাড়াই কার্যনির্বাহী মূলধন ঋণ (প্রথম কিস্তি ₹১০,০০০, দ্বিতীয় ₹২০,০০০, তৃতীয় ₹৫০,০০০)। ৭% সুদে ভর্তুকি এবং ডিজিটাল লেনদেনে বার্ষিক ₹১,২০০ পর্যন্ত ক্যাশব্যাক।\n• যোগ্যতা: শহরাঞ্চলের হকার ও স্ট্রিট ভেন্ডার যাদের ভেন্ডিং সার্টিফিকেট আছে।\n• পোর্টাল: https://pmsvanidhi.mohua.gov.in\n\n2. 🛒 **PM-SYM (শ্রম যোগী মানধন পেনশন)**:\n• সুবিধা: ৬০ বছর বয়সের পর প্রতি মাসে ₹৩,০০০ নিশ্চিত পেনশন।`;
+    }
+    if (langCode === 'ta') {
+      return `சாலையோர வியாபாரிகளுக்கான சிறந்த அரசு திட்டங்கள்:\n\n1. 🛒 **PM SVANidhi (பிஎம் ஸ்வநிதி திட்டம்)**:\n• பயன்கள்: பிணையற்ற மூலதன கடன் (முதல் தவணை ₹10,000, 2வது ₹20,000, 3வது ₹50,000). 7% வட்டி மானியம் மற்றும் டிஜிட்டல் பணப்பரிவர்த்தனைக்கு கேஷ்பேக்.\n• தகுதி: அங்கீகரிக்கப்பட்ட சாலையோர வியாபாரிகள்.\n• போர்டல்: https://pmsvanidhi.mohua.gov.in\n\n2. 🛒 **PM-SYM (பிரதான் மந்திரி ஷ்ரம் யோகி மான்தன்)**:\n• பயன்கள்: 60 வயதுக்குப் பின் மாதம் ₹3,000 ஓய்வூதியம்.`;
+    }
+    if (langCode === 'te') {
+      return `వీధి వ్యాపారుల కోసం కేంద్ర ప్రభుత్వ పథకాలు:\n\n1. 🛒 **PM SVANidhi (పీఎం స్వనిధి పథకం)**:\n• ప్రయోజనం: ఎలాంటి హామీ లేకుండా వర్కింగ్ క్యాపిటల్ రుణం (మొదటి విడత ₹10,000, 2వ విడత ₹20,000, 3వ విడత ₹50,000). 7% వడ్డీ రాయితీ.\n• అర్హత: పట్టణ ప్రాంతాల్లోని గుర్తింపు పొందిన వీధి వ్యాపారులు.\n• పోర్టల్: https://pmsvanidhi.mohua.gov.in\n\n2. 🛒 **PM-SYM (శ్రమ యోగి మాన్‌ధన్ పెన్షన్)**:\n• ప్రయోజనం: 60 ఏళ్ల తర్వాత నెలకు ₹3,000 హామీ పెన్షన్.`;
     }
     return `Top Government Schemes for Street Vendors & Hawkers:\n\n1. 🛒 **PM SVANidhi (PM Street Vendor's AtmaNirbhar Nidhi)**:\n• Benefit: Collateral-free working capital loan: 1st tranche ₹10,000; 2nd tranche ₹20,000; 3rd tranche ₹50,000 with 7% interest subsidy & digital UPI cashbacks.\n• Eligibility: Urban street vendors and hawkers with a Certificate of Vending (CoV) / Identity Card.\n• Apply Online: https://pmsvanidhi.mohua.gov.in | Portal details: /schemes/pm-svanidhi\n\n2. 🛒 **PM-SYM (Pradhan Mantri Shram Yogi Maandhan)**:\n• Benefit: Guaranteed lifelong pension of ₹3,000 per month after age 60.\n• Eligibility: Unorganized workers aged 18-40 with monthly income ≤ ₹15,000.\n• Apply Online: https://maandhan.in | Portal details: /schemes/pm-sym`;
   }
@@ -457,6 +528,34 @@ function buildDeterministicGroundedAnswer(params: {
 }
 
 function getSuggestedPrompts(scheme: Scheme, langCode: string): string[] {
+  if (langCode === 'mr') {
+    return [
+      `कोणती कागदपत्रे आवश्यक आहेत?`,
+      `अधिकृत पोर्टलवर अर्ज कसा करावा?`,
+      `या योजनेचे काय आर्थिक लाभ मिळतात?`
+    ];
+  }
+  if (langCode === 'bn') {
+    return [
+      `কী কী প্রয়োজনীয় নথিপত্র লাগবে?`,
+      `অফিসিয়াল পোর্টালে কীভাবে আবেদন করবেন?`,
+      `এই স্কিম থেকে কী কী আর্থিক সুবিধা পাবেন?`
+    ];
+  }
+  if (langCode === 'ta') {
+    return [
+      `விண்ணப்பிக்க என்ன ஆவணங்கள் தேவை?`,
+      `அதிகாரப்பூர்வ தளத்தில் எவ்வாறு விண்ணப்பிப்பது?`,
+      `இந்த திட்டத்தின் நிதி நன்மைகள் என்ன?`
+    ];
+  }
+  if (langCode === 'te') {
+    return [
+      `ఏ ఏ ధ్రువీకరణ పత్రాలు అవసరం?`,
+      `అధికారిక పోర్టల్‌లో ఎలా దరఖాస్తు చేసుకోవాలి?`,
+      `ఈ పథకం కింద ఎంత ఆర్థిక ప్రయోజనం లభిస్తుంది?`
+    ];
+  }
   if (langCode === 'hi') {
     return [
       `कौन से दस्तावेज जरूरी हैं?`,
